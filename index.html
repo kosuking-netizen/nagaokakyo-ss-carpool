@@ -405,8 +405,8 @@
         未設定の端末では自動取得は使えません（登録済み会場での精算計算はキー不要で使えます）。
       </div>
       <div class="info" style="margin-top:8px;">
-        キーは <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-totalnavi" target="_blank" rel="noopener">RapidAPIのNAVITIME Route(totalnavi)</a> で無料取得できます
-        （月500回まで・超過は停止するだけで自動課金なし・クレジットカード不要）。
+        キーは <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-car" target="_blank" rel="noopener">RapidAPIのNAVITIME Route(car)</a> で無料取得できます
+        （Pricing → Basicプランを Subscribe。月500回まで・超過は停止するだけで自動課金なし・クレジットカード不要）。
         キーは<b>この端末の中だけ</b>に保存され、他の人には見えません。
       </div>
       <label class="field">APIキー（X-RapidAPI-Key）</label>
@@ -565,16 +565,16 @@
 
   // ---------- NAVITIME (RapidAPI・正確な高速料金) ----------
   async function routeNavitime(from, to, key) {
-    const url =
-      "https://navitime-route-totalnavi.p.rapidapi.com/route_car" +
-      `?start=${from.lat}%2C${from.lon}&goal=${to.lat}%2C${to.lon}` +
-      "&condition=toll_time";  // 有料道路優先・時間最短
-    const r = await fetch(url, {
-      headers: {
-        "X-RapidAPI-Key": key,
-        "X-RapidAPI-Host": "navitime-route-totalnavi.p.rapidapi.com",
-      },
-    });
+    const base =
+      "https://navitime-route-car.p.rapidapi.com/route_car" +
+      `?start=${from.lat}%2C${from.lon}&goal=${to.lat}%2C${to.lon}`;
+    const headers = {
+      "X-RapidAPI-Key": key,
+      "X-RapidAPI-Host": "navitime-route-car.p.rapidapi.com",
+    };
+    // 有料道路優先・時間重視。条件パラメータ非対応なら条件なしで再試行
+    let r = await fetch(base + "&condition=toll_time", { headers });
+    if (r.status === 400) r = await fetch(base, { headers });
     if (!r.ok) throw new Error("navitime http " + r.status);
     const j = await r.json();
     const item = j.items && j.items[0];
