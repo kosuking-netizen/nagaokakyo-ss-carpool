@@ -7,6 +7,9 @@
 <meta property="og:title" content="長岡京SS 配車交通費精算">
 <meta property="og:description" content="会場を入れるだけで配車の交通費精算額を自動計算。ルート・高速料金は毎回最新を取得。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1a7a4a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap" rel="stylesheet">
@@ -20,7 +23,7 @@
     --bg: #f4f6f5;
     --card: #ffffff;
     --border: #e2e6e4;
-    --accent: #f59e0b;
+    --accent: #d93636;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   input, button, select, textarea { font-family: inherit; }
@@ -181,7 +184,7 @@
     vertical-align: middle;
   }
   .badge-shared { background: var(--green-light); color: var(--green-dark); }
-  .badge-local { background: #fef3c7; color: #92400e; }
+  .badge-local { background: #fdeaea; color: #b02a2a; }
 
   .cand-list { margin-top: 10px; }
   .cand-item {
@@ -1092,7 +1095,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.20";
+  const APP_VERSION = "2.21";
   let lastGasApplied = null;
 
   function refresh() {
