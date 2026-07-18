@@ -42,22 +42,6 @@ if (D) {
   ok(typeof mp.name === "string" && mp.name.length > 0, "meetingPoint.name がありません");
   ok(mp.lat > 34 && mp.lat < 36 && mp.lon > 134.5 && mp.lon < 136.5,
     "meetingPoint の座標が京都周辺ではありません: " + mp.lat + "," + mp.lon);
-
-  // 会場マスタ
-  ok(Array.isArray(D.venues), "venues が配列ではありません");
-  if (Array.isArray(D.venues)) {
-    const names = new Set();
-    D.venues.forEach((v, i) => {
-      const tag = `venues[${i}]（${(v && v.name) || "名称なし"}）`;
-      ok(v && typeof v.name === "string" && v.name.trim().length > 0, tag + ": name がありません");
-      ok(typeof v.km === "number" && v.km > 0 && v.km <= 300, tag + ": 片道距離が異常です: " + (v && v.km));
-      ok(typeof v.etc === "number" && v.etc >= 0 && v.etc <= 20000, tag + ": ETC料金が異常です: " + (v && v.etc));
-      if (v && v.name) {
-        ok(!names.has(v.name), tag + ": 会場名が重複しています");
-        names.add(v.name);
-      }
-    });
-  }
 }
 
 if (errors.length) {
@@ -65,4 +49,4 @@ if (errors.length) {
   errors.forEach((e) => console.error("  - " + e));
   process.exit(1);
 }
-console.log(`✅ data.js OK（会場 ${D.venues.length} 件・ガソリン ${D.gasPrice.price}円/L・${D.gasPrice.week}の週）`);
+console.log(`✅ data.js OK（ガソリン ${D.gasPrice.price}円/L・${D.gasPrice.week}の週）`);

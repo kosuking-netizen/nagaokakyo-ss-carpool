@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>長岡京SS 配車交通費精算</title>
 <meta property="og:title" content="長岡京SS 配車交通費精算">
-<meta property="og:description" content="会場を選ぶだけで配車の交通費精算額を自動計算。ガソリン価格は毎週自動更新。">
+<meta property="og:description" content="会場を入れるだけで配車の交通費精算額を自動計算。ルート・高速料金は毎回最新を取得。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <style>
   :root {
@@ -156,15 +156,6 @@
   .badge-shared { background: var(--green-light); color: var(--green-dark); }
   .badge-local { background: #fef3c7; color: #92400e; }
 
-  .venue-item {
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 14px;
-  }
-  .venue-item:last-child { border-bottom: none; }
-  .venue-item .vname { font-weight: 700; font-size: 15px; }
-  .venue-item .vdetail { color: var(--gray); font-size: 13px; margin-top: 2px; }
-
   .cand-list { margin-top: 10px; }
   .cand-item {
     padding: 10px 12px;
@@ -178,6 +169,19 @@
   .cand-item:active, .cand-item:hover { background: var(--green-light); border-color: var(--green); }
   .cand-item .cname { font-weight: 700; }
   .cand-item .caddr { font-size: 12px; color: var(--gray); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    background: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--green-dark);
+    font-weight: 600;
+  }
+  .chip:active, .chip:hover { background: var(--green-light); border-color: var(--green); }
 
   .spinner {
     display: inline-block;
@@ -270,7 +274,6 @@
 
 <nav>
   <button class="active" data-tab="calc">精算計算</button>
-  <button data-tab="venues">会場マスタ</button>
   <button data-tab="settings">価格・設定</button>
 </nav>
 
@@ -279,13 +282,37 @@
   <!-- ============ 精算計算 ============ -->
   <section id="tab-calc" class="active">
     <div class="card">
-      <h2>交通費を計算する</h2>
+      <h2>① 会場を入れる</h2>
+      <div class="info">
+        会場名や住所で検索して候補をタップすると、集合場所（<b id="meetingPointName2"></b>）からの
+        <b>最新のルート・高速料金（NAVITIME・ETC普通車）</b>をその場で取得します。
+      </div>
+
+      <label class="field" style="margin-top:12px;">会場名・住所で検索</label>
+      <div class="row">
+        <div><input type="search" id="venueQuery" placeholder="例：太陽が丘 / J-GREEN堺"></div>
+        <div style="flex:0 0 auto;">
+          <button class="btn-small" id="venueSearchBtn" style="margin-top:0;padding:11px 16px;">検索</button>
+        </div>
+      </div>
+      <div class="cand-list" id="venueCands"></div>
+
+      <div id="historyBox" style="display:none;">
+        <label class="field">最近の会場（タップで最新ルートを再取得）</label>
+        <div class="chips" id="historyChips"></div>
+      </div>
+
+      <div id="routeStatus" class="info" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>② 内容を確認して計算</h2>
 
       <label class="field">試合の日付</label>
       <input type="date" id="calcDate">
 
-      <label class="field">会場</label>
-      <select id="venueSelect"></select>
+      <label class="field">会場名</label>
+      <input type="text" id="calcVenueName" placeholder="検索から自動入力（手入力も可）">
 
       <div class="row" style="margin-top:12px;">
         <div>
@@ -294,7 +321,7 @@
         </div>
         <div>
           <label class="field">片道ETC料金（円）</label>
-          <input type="number" id="calcEtc" step="10" min="0" inputmode="numeric">
+          <input type="number" id="calcEtc" step="10" min="0" inputmode="numeric" placeholder="高速なしは0">
         </div>
       </div>
 
@@ -322,63 +349,6 @@
       </div>
 
       <button class="btn btn-primary" id="copyBtn" style="display:none;">精算結果をコピー（LINE用）</button>
-    </div>
-  </section>
-
-  <!-- ============ 会場マスタ ============ -->
-  <section id="tab-venues">
-    <div class="card">
-      <h2>会場を検索して自動登録</h2>
-      <div class="info">
-        会場名や住所を入れて検索すると、集合場所（<b id="meetingPointName2"></b>）からの
-        <b>距離・所要時間・高速料金</b>を自動で取得します。<br>
-        料金取得モード：<span id="routeModeInfo"></span>
-      </div>
-
-      <label class="field" style="margin-top:12px;">会場名・住所で検索</label>
-      <div class="row">
-        <div><input type="search" id="venueQuery" placeholder="例：太陽が丘 / 丹波自然運動公園"></div>
-        <div style="flex:0 0 auto;">
-          <button class="btn-small" id="venueSearchBtn" style="margin-top:0;padding:11px 16px;">検索</button>
-        </div>
-      </div>
-      <div class="cand-list" id="venueCands"></div>
-      <div id="routeStatus" class="info" style="margin-top:8px;"></div>
-    </div>
-
-    <div class="card">
-      <h2>登録内容の確認・保存</h2>
-
-      <label class="field">会場名</label>
-      <input type="text" id="newName" placeholder="検索から自動入力（手入力も可）">
-
-      <div class="row" style="margin-top:12px;">
-        <div>
-          <label class="field">片道距離（km）</label>
-          <input type="number" id="newKm" step="0.1" min="0" inputmode="decimal">
-        </div>
-        <div>
-          <label class="field">片道ETC料金（円）</label>
-          <input type="number" id="newEtc" step="10" min="0" inputmode="numeric" placeholder="高速なしは0">
-        </div>
-      </div>
-
-      <label class="field">メモ（任意）</label>
-      <input type="text" id="newMemo" placeholder="自動入力：所要時間・料金の取得元など">
-
-      <button class="btn btn-primary" id="addVenueBtn">この端末に保存する</button>
-
-      <div class="hint">
-        ここで追加した会場は<b>この端末だけ</b>に保存されます。
-        全員のアプリに反映したいときは、下の「共有データ用にコピー」を押して、
-        出てきたテキストを管理者（井沢さん）にLINE等で送ってください。
-      </div>
-      <button class="btn-small" id="exportBtn">共有データ用にコピー</button>
-    </div>
-
-    <div class="card">
-      <h2>登録済みの会場</h2>
-      <div id="venueList"></div>
     </div>
   </section>
 
@@ -411,20 +381,21 @@
     </div>
 
     <div class="card">
-      <h2>NAVITIME APIキー（管理者用）</h2>
+      <h2>NAVITIME APIキー（計算する人ごとに設定）</h2>
       <div class="info">
         状態：<span class="badge" id="apiKeyBadge"></span><br>
-        会場の自動取得（<b>NAVITIMEの正確な高速料金（ETC・普通車）と距離</b>）に必要です。
-        未設定の端末では自動取得は使えません（登録済み会場での精算計算はキー不要で使えます）。
+        ルート・高速料金の自動取得に必要です。<b>計算する人（運転する保護者）の端末ごと</b>に一度だけ設定してください。
+        キーはチームの管理者から受け取るか、下記リンクから無料取得できます。
+        未設定でも距離・料金を手入力すれば計算できます。
       </div>
       <div class="info" style="margin-top:8px;">
-        キーは <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-car" target="_blank" rel="noopener">RapidAPIのNAVITIME Route(car)</a> で無料取得できます
-        （Pricing → Basicプランを Subscribe。月500回まで・超過は停止するだけで自動課金なし・クレジットカード不要）。
+        自分で取得する場合：<a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-car" target="_blank" rel="noopener">RapidAPIのNAVITIME Route(car)</a>
+        で無料アカウント作成 → Pricing → Basic($0.00) を Subscribe（月500回まで・超過は停止するだけで自動課金なし・クレジットカード不要）。
         キーは<b>この端末の中だけ</b>に保存され、他の人には見えません。
       </div>
       <label class="field">APIキー（X-RapidAPI-Key）</label>
       <div class="row">
-        <div><input type="password" id="apiKeyInput" placeholder="RapidAPIで取得したキーを貼り付け"></div>
+        <div><input type="password" id="apiKeyInput" placeholder="APIキーを貼り付け"></div>
         <div style="flex:0 0 auto;">
           <button class="btn-small" id="apiKeySaveBtn" style="margin-top:0;padding:11px 16px;">保存</button>
           <button class="btn-small btn-danger-text" id="apiKeyClearBtn" style="margin-top:0;padding:11px 12px;">削除</button>
@@ -436,10 +407,10 @@
       <h2>精算ルール</h2>
       <ul class="info">
         <li>集合場所：<b>ローソン長岡京インター店</b> → 会場の<b>時間最短ルート</b>（有料道路優先）</li>
+        <li>ルート・高速料金は<b>計算のたびにNAVITIMEから最新を取得</b>（道路や料金の変更に自動追従）</li>
         <li>距離・ETC料金は<b>往復分</b>（片道の2倍）</li>
         <li>燃費は <b>7km/L</b> で統一</li>
         <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」（毎週水曜夜に自動更新）</li>
-        <li>高速料金はNAVITIMEの実額（ETC・普通車・往復）</li>
         <li>丸め方：ガソリン代を1円単位に四捨五入 → 高速代と合計して10円単位に四捨五入 ／ 一人あたりは10円単位に切り上げ</li>
       </ul>
       <div class="info" style="margin-top:8px;">
@@ -452,10 +423,10 @@
       <h2>安全のしくみ</h2>
       <ul class="info">
         <li><b>計算式の自動テスト</b>：計算ロジックは更新のたびにGitHubが自動検証（期待値と1円でも違えば通知）</li>
-        <li><b>共有データの自動検証</b>：data.jsの編集ミス（構文エラー・異常な価格や距離）はpush時に自動チェックで検出</li>
+        <li><b>共有データの自動検証</b>：data.jsの編集ミス（構文エラー・異常な価格）はpush時に自動チェックで検出</li>
         <li><b>価格急変の停止装置</b>：ガソリン価格の自動取得値が前週から15円超変動したら、誤取得とみなし更新を停止して管理者に通知</li>
         <li><b>画面上の警告</b>：価格・距離・高速代・人数が通常範囲を外れると計算結果に警告を表示</li>
-        <li><b>変更履歴</b>：価格・会場マスタの変更はすべてGitHubに記録され、いつでも遡って確認可能</li>
+        <li><b>変更履歴</b>：共有データの変更はすべてGitHubに記録され、いつでも遡って確認可能</li>
         <li><b>計算根拠の明示</b>：LINEコピー文に単価・距離・燃費を含めるため、受け取った人も検算可能</li>
       </ul>
     </div>
@@ -465,7 +436,7 @@
       <ol class="info">
         <li>GitHubで <a href="https://github.com/kosuking-netizen/nagaokakyo-ss-carpool/blob/master/data.js" target="_blank" rel="noopener"><b>data.js</b></a> を開く</li>
         <li>鉛筆マーク（Edit）を押す</li>
-        <li>会場（venues）などを書き換える（ガソリン価格は自動更新なので触らなくてOK）</li>
+        <li>集合場所などを書き換える（ガソリン価格は自動更新なので触らなくてOK）</li>
         <li>「Commit changes」を押す → 数分で全員のアプリに反映</li>
       </ol>
     </div>
@@ -487,15 +458,17 @@
 (function () {
   const D = window.APP_DATA;
   // 共有データが壊れている場合は誤計算を防ぐため画面全体を止める
-  if (!D || !D.gasPrice || !Array.isArray(D.venues) || !window.NSS_CALC) {
+  if (!D || !D.gasPrice || !D.meetingPoint || !window.NSS_CALC) {
     document.querySelector("main").innerHTML =
       '<div class="card"><h2 style="color:#b91c1c;">データ読み込みエラー</h2>' +
       '<div class="info">共有データ（data.js）が壊れている可能性があります。計算を停止しました。管理者（井沢さん）に連絡してください。</div></div>';
     return;
   }
-  const LS_VENUES = "nss_localVenues";
+
   const LS_GAS = "nss_gasOverride";
   const LS_APIKEY = "nss_rapidApiKey";
+  const LS_HISTORY = "nss_venueHistory";
+  const HISTORY_MAX = 8;
 
   // ---------- utilities ----------
   const $ = (id) => document.getElementById(id);
@@ -516,13 +489,6 @@
     );
   }
 
-  function localVenues() {
-    try { return JSON.parse(localStorage.getItem(LS_VENUES)) || []; }
-    catch { return []; }
-  }
-  function saveLocalVenues(list) {
-    localStorage.setItem(LS_VENUES, JSON.stringify(list));
-  }
   function gasOverride() {
     try { return JSON.parse(localStorage.getItem(LS_GAS)); }
     catch { return null; }
@@ -531,16 +497,22 @@
     const ov = gasOverride();
     return ov ? ov.price : D.gasPrice.price;
   }
+  const KEY_CLEAN_RE = new RegExp("[\\s\\u200B-\\u200D\\uFEFF]", "g");
   function apiKey() {
     // 空白・不可視文字（ゼロ幅スペース等）が混ざって保存されていても除去して使う
     return (localStorage.getItem(LS_APIKEY) || "").replace(KEY_CLEAN_RE, "");
   }
-  const KEY_CLEAN_RE = new RegExp("[\\s\\u200B-\\u200D\\uFEFF]", "g");
-  function allVenues() {
-    return [
-      ...D.venues.map((v) => ({ ...v, shared: true })),
-      ...localVenues().map((v) => ({ ...v, shared: false })),
-    ];
+
+  // 最近使った会場（名前と座標のみ保存。ルート・料金は毎回取り直す）
+  function venueHistory() {
+    try { return JSON.parse(localStorage.getItem(LS_HISTORY)) || []; }
+    catch { return []; }
+  }
+  function pushHistory(place) {
+    const list = venueHistory().filter((h) => h.name !== place.name);
+    list.unshift({ name: place.name, lat: place.lat, lon: place.lon });
+    localStorage.setItem(LS_HISTORY, JSON.stringify(list.slice(0, HISTORY_MAX)));
+    renderHistory();
   }
 
   // ---------- free geocoding (GSI + OpenStreetMap Nominatim) ----------
@@ -662,7 +634,6 @@
       km: move.distance / 1000,
       min: move.time,
       toll: Math.round(toll || 0),
-      src: "navitime",
     };
   }
 
@@ -676,42 +647,86 @@
     });
   });
 
-  // ---------- calc tab ----------
-  function renderVenueSelect() {
-    const sel = $("venueSelect");
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">－ 会場を選択 －</option>';
-    // 値は会場名で管理する（番号管理だと会場の追加・削除で選択がズレるため）
-    allVenues().forEach((v) => {
-      const opt = document.createElement("option");
-      opt.value = "v:" + v.name;
-      opt.textContent = v.name + (v.shared ? "" : "（この端末のみ）");
-      sel.appendChild(opt);
-    });
-    const manual = document.createElement("option");
-    manual.value = "manual";
-    manual.textContent = "（マスタにない会場：手入力）";
-    sel.appendChild(manual);
-    if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
-  }
-
-  // プルダウンで実在の会場が選ばれているときだけ返す（未選択""や"manual"はnull）
-  function selectedVenue() {
-    const val = $("venueSelect").value;
-    if (!val.startsWith("v:")) return null;
-    const name = val.slice(2);
-    return allVenues().find((v) => v.name === name) || null;
-  }
-
-  function onVenueChange() {
-    const v = selectedVenue();
-    if (v) {
-      $("calcKm").value = v.km;
-      $("calcEtc").value = v.etc;
+  // ---------- 会場検索 → その場で最新ルート取得 ----------
+  async function searchVenues() {
+    const q = $("venueQuery").value.trim();
+    if (!q) { toast("会場名か住所を入力してください"); return; }
+    const box = $("venueCands");
+    box.innerHTML = '<div class="info"><span class="spinner"></span>検索中…</div>';
+    try {
+      const cands = await geocode(q);
+      if (!cands.length) {
+        box.innerHTML = '<div class="info">見つかりませんでした。市区町村名を足してみてください（例：太陽が丘 宇治市）</div>';
+        return;
+      }
+      box.innerHTML = "";
+      cands.forEach((c) => {
+        const div = document.createElement("div");
+        div.className = "cand-item";
+        div.innerHTML =
+          `<div class="cname">${escapeHtml(c.name)}</div>` +
+          (c.addr && c.addr !== c.name ? `<div class="caddr">${escapeHtml(c.addr)}</div>` : "");
+        div.addEventListener("click", () => fetchRouteFor(c));
+        box.appendChild(div);
+      });
+    } catch (e) {
+      box.innerHTML = '<div class="info">検索でエラーが発生しました。通信環境を確認してもう一度お試しください。</div>';
     }
+  }
+
+  async function fetchRouteFor(place) {
+    const mp = D.meetingPoint;
+    const st = $("routeStatus");
+    $("calcVenueName").value = place.name;
+    const key = apiKey();
+    if (!key) {
+      st.innerHTML =
+        "⚠ NAVITIME APIキーが未設定のため自動取得できません。「価格・設定」タブでキーを設定するか、距離とETC料金を手入力してください。";
+      return;
+    }
+    st.innerHTML = '<span class="spinner"></span>NAVITIMEで最新ルートを取得中…';
+    let r;
+    try {
+      r = await routeNavitime(mp, place, key);
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : String(e);
+      console.warn("NAVITIME取得失敗:", msg);
+      st.innerHTML =
+        `⚠ NAVITIMEの取得に失敗しました（${escapeHtml(msg)}）。` +
+        "再試行するか、距離・料金を手入力してください。";
+      return;
+    }
+    const km = Math.round(r.km * 10) / 10;
+    $("calcKm").value = km;
+    $("calcEtc").value = r.toll;
+    $("venueCands").innerHTML = "";
+    pushHistory(place);
+    st.innerHTML =
+      `✅ <b>${escapeHtml(place.name)}</b>：片道 ${km}km・約${r.min}分` +
+      (r.toll > 0 ? `・高速代 ${yen(r.toll)}（片道・NAVITIME実額）` : "・高速なし") +
+      "（いま時点の最新ルート） ／ " +
+      `<a href="https://www.google.com/maps/dir/?api=1&origin=${mp.lat},${mp.lon}&destination=${place.lat},${place.lon}&travelmode=driving" target="_blank" rel="noopener">地図で距離を照合</a>`;
     recalc();
   }
 
+  function renderHistory() {
+    const list = venueHistory();
+    $("historyBox").style.display = list.length ? "block" : "none";
+    const box = $("historyChips");
+    box.innerHTML = "";
+    list.forEach((h) => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.textContent = h.name;
+      b.addEventListener("click", () => fetchRouteFor(h));
+      box.appendChild(b);
+    });
+  }
+
+  $("venueSearchBtn").addEventListener("click", searchVenues);
+  $("venueQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") searchVenues(); });
+
+  // ---------- 計算 ----------
   function calcValues() {
     // 計算本体は calc.js（自動テスト済みの純関数）に委譲
     return window.NSS_CALC.calcSettlement({
@@ -781,8 +796,7 @@
   function buildCopyText() {
     const c = calcValues();
     if (!c) return "";
-    const v = selectedVenue();
-    const venueName = v ? v.name : "（手入力）";
+    const venueName = $("calcVenueName").value.trim() || "（会場名未入力）";
     const dateVal = $("calcDate").value;
     let dateStr = "";
     if (dateVal) {
@@ -810,157 +824,9 @@
     );
   });
 
-  $("venueSelect").addEventListener("change", onVenueChange);
   ["calcKm", "calcEtc", "calcGas", "calcPax"].forEach((id) =>
     $(id).addEventListener("input", recalc)
   );
-
-  // ---------- venues tab：検索→自動取得 ----------
-  async function searchVenues() {
-    const q = $("venueQuery").value.trim();
-    if (!q) { toast("会場名か住所を入力してください"); return; }
-    const box = $("venueCands");
-    box.innerHTML = '<div class="info"><span class="spinner"></span>検索中…</div>';
-    try {
-      const cands = await geocode(q);
-      if (!cands.length) {
-        box.innerHTML = '<div class="info">見つかりませんでした。市区町村名を足してみてください（例：太陽が丘 宇治市）</div>';
-        return;
-      }
-      box.innerHTML = "";
-      cands.forEach((c) => {
-        const div = document.createElement("div");
-        div.className = "cand-item";
-        div.innerHTML =
-          `<div class="cname">${escapeHtml(c.name)}</div>` +
-          (c.addr && c.addr !== c.name ? `<div class="caddr">${escapeHtml(c.addr)}</div>` : "");
-        div.addEventListener("click", () => pickVenueCandidate(c));
-        box.appendChild(div);
-      });
-    } catch (e) {
-      box.innerHTML = '<div class="info">検索でエラーが発生しました。通信環境を確認してもう一度お試しください。</div>';
-    }
-  }
-
-  async function pickVenueCandidate(c) {
-    const mp = D.meetingPoint;
-    const st = $("routeStatus");
-    const key = apiKey();
-    if (!key) {
-      st.innerHTML =
-        "⚠ NAVITIME APIキーが未設定のため自動取得できません。「価格・設定」タブでキーを設定してください（登録済み会場の計算は使えます）。";
-      return;
-    }
-    st.innerHTML = '<span class="spinner"></span>NAVITIMEでルートを計算中…';
-    let r;
-    try {
-      r = await routeNavitime(mp, c, key);
-    } catch (e) {
-      const msg = (e && e.message) ? e.message : String(e);
-      console.warn("NAVITIME取得失敗:", msg);
-      st.innerHTML =
-        `⚠ NAVITIMEの取得に失敗しました（${escapeHtml(msg)}）。` +
-        "時間をおいて再試行するか、このエラー文を管理者に伝えてください。距離・料金の手入力もできます。";
-      return;
-    }
-    const km = Math.round(r.km * 10) / 10;
-    $("newName").value = c.name;
-    $("newKm").value = km;
-    $("newEtc").value = r.toll;
-    $("newMemo").value =
-      `約${r.min}分・` + (r.toll > 0 ? "高速あり（NAVITIME・ETC普通車）" : "高速なし");
-    $("venueCands").innerHTML = "";
-    st.innerHTML =
-      `✅ <b>${escapeHtml(c.name)}</b>：片道 ${km}km・約${r.min}分` +
-      (r.toll > 0 ? `・高速代 ${yen(r.toll)}（片道・NAVITIME実額）` : "・高速なし") +
-      " → 下の内容を確認して保存してください ／ " +
-      `<a href="https://www.google.com/maps/dir/?api=1&origin=${mp.lat},${mp.lon}&destination=${c.lat},${c.lon}&travelmode=driving" target="_blank" rel="noopener">地図で距離を照合</a>`;
-  }
-
-  $("venueSearchBtn").addEventListener("click", searchVenues);
-  $("venueQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") searchVenues(); });
-
-  function renderVenueList() {
-    const box = $("venueList");
-    const vs = allVenues();
-    if (vs.length === 0) {
-      box.innerHTML = '<div class="info">まだ会場が登録されていません。</div>';
-      return;
-    }
-    box.innerHTML = "";
-    vs.forEach((v, i) => {
-      const div = document.createElement("div");
-      div.className = "venue-item";
-      const badge = v.shared
-        ? '<span class="badge badge-shared">共有</span>'
-        : '<span class="badge badge-local">この端末のみ</span>';
-      div.innerHTML =
-        `<div class="vname">${escapeHtml(v.name)} ${badge}</div>` +
-        `<div class="vdetail">片道 ${v.km}km ／ ETC片道 ${yen(v.etc)}${v.memo ? " ／ " + escapeHtml(v.memo) : ""}</div>`;
-      if (!v.shared) {
-        const del = document.createElement("button");
-        del.className = "btn-small btn-danger-text";
-        del.textContent = "削除";
-        del.addEventListener("click", () => {
-          const locals = localVenues();
-          locals.splice(i - D.venues.length, 1);
-          saveLocalVenues(locals);
-          refresh();
-          toast("削除しました");
-        });
-        div.appendChild(del);
-      }
-      box.appendChild(div);
-    });
-  }
-
-  $("addVenueBtn").addEventListener("click", () => {
-    const name = $("newName").value.trim();
-    const km = parseFloat($("newKm").value);
-    const etc = parseFloat($("newEtc").value) || 0;
-    const memo = $("newMemo").value.trim();
-    if (!name || !(km > 0)) {
-      toast("会場名と片道距離を入力してください");
-      return;
-    }
-    if (etc < 0) {
-      toast("ETC料金は0以上で入力してください");
-      return;
-    }
-    if (allVenues().some((v) => v.name === name)) {
-      toast("同じ名前の会場がすでに登録されています");
-      return;
-    }
-    const locals = localVenues();
-    locals.push({ name, km, etc, memo });
-    saveLocalVenues(locals);
-    $("newName").value = "";
-    $("newKm").value = "";
-    $("newEtc").value = "";
-    $("newMemo").value = "";
-    $("routeStatus").innerHTML = "";
-    refresh();
-    toast("この端末に保存しました");
-  });
-
-  $("exportBtn").addEventListener("click", () => {
-    const locals = localVenues();
-    if (locals.length === 0) {
-      toast("この端末で追加した会場がありません");
-      return;
-    }
-    const lines = locals.map((v) =>
-      `    { name: ${JSON.stringify(v.name)}, km: ${v.km}, etc: ${v.etc}, memo: ${JSON.stringify(v.memo || "")} },`
-    );
-    const text =
-      "【会場マスタ追加依頼】長岡京SS精算アプリ\n" +
-      "data.js の venues に以下を追加してください：\n\n" +
-      lines.join("\n");
-    navigator.clipboard.writeText(text).then(
-      () => toast("コピーしました。管理者に送ってください"),
-      () => { prompt("長押しでコピーしてください", text); }
-    );
-  });
 
   // ---------- settings tab ----------
   function renderGas() {
@@ -997,12 +863,9 @@
     if (apiKey()) {
       badge.className = "badge badge-shared";
       badge.textContent = "設定済み";
-      $("routeModeInfo").innerHTML = "<b>NAVITIME（正確な高速料金・ETC普通車）</b>";
     } else {
       badge.className = "badge badge-local";
       badge.textContent = "未設定";
-      $("routeModeInfo").innerHTML =
-        "⚠ APIキー未設定のため自動取得は使えません（設定タブで設定）";
     }
   }
 
@@ -1026,14 +889,13 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "1.3";
+  const APP_VERSION = "2.0";
   let lastGasApplied = null;
 
   function refresh() {
-    renderVenueSelect();
-    renderVenueList();
     renderGas();
     renderApiKey();
+    renderHistory();
     // 計算画面のガソリン価格は、ユーザーが手で変えていない場合のみ反映
     const g = effectiveGasPrice();
     const cur = parseFloat($("calcGas").value);
@@ -1041,14 +903,6 @@
     lastGasApplied = g;
     recalc();
   }
-
-  // 共有マスタに取り込み済みのローカル会場を自動整理（二重表示を防ぐ）
-  (function pruneLocalVenues() {
-    const sharedNames = new Set(D.venues.map((v) => v.name));
-    const locals = localVenues();
-    const kept = locals.filter((v) => !sharedNames.has(v.name));
-    if (kept.length !== locals.length) saveLocalVenues(kept);
-  })();
 
   $("appVersion").textContent = APP_VERSION;
   $("headerSub").textContent =
