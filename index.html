@@ -567,7 +567,7 @@
       q[kind] = {
         remaining: rem,
         limit: lim,
-        resetDays: isNaN(reset) ? null : Math.ceil(reset / 86400),
+        resetAt: isNaN(reset) ? null : Date.now() + reset * 1000,
         at: Date.now(),
         personal: !!personalKey(),
       };
@@ -578,9 +578,16 @@
   function quotaLine(label, e) {
     if (!e) return label + "：未取得";
     const warn = e.remaining <= 50;
+    // 旧形式（resetDays）のデータは記録時刻から日付に換算する
+    let resetAt = e.resetAt;
+    if (resetAt == null && e.resetDays != null && e.at) resetAt = e.at + e.resetDays * 86400000;
+    let resetTxt = "";
+    if (resetAt != null) {
+      const d = new Date(resetAt);
+      resetTxt = `（${d.getMonth() + 1}/${d.getDate()}頃リセット）`;
+    }
     return (
-      `${label}：<b${warn ? ' style="color:#b91c1c;"' : ""}>残り${e.remaining}回</b>／${e.limit}回` +
-      (e.resetDays != null ? `（あと${e.resetDays}日でリセット）` : "")
+      `${label}：<b${warn ? ' style="color:#b91c1c;"' : ""}>残り${e.remaining}回</b>／${e.limit}回` + resetTxt
     );
   }
   function renderQuota() {
@@ -1083,7 +1090,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.25";
+  const APP_VERSION = "2.26";
   let lastGasApplied = null;
 
   function refresh() {
