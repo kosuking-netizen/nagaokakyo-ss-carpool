@@ -406,7 +406,8 @@
         <li>距離・ETC料金は<b>往復分</b>（片道の2倍）</li>
         <li>燃費は <b>7km/L</b> で統一</li>
         <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」（毎週水曜夜に自動更新）</li>
-        <li>単価は<b>計算した時点の最新週の価格</b>を使います。「試合の日付」はLINE文の表記のみで、金額には影響しません（試合直後の精算を想定した割り切り仕様。週ごとの価格差は通常±1〜2円/Lで、精算額への影響は数十円未満）</li>
+        <li>ETC料金は<b>「試合の日付」の朝8時出発</b>として計算します（土日祝の<b>ETC休日割引を自動反映</b>。日付を変えるとルート・料金を取り直します）</li>
+        <li>ガソリン単価は<b>計算した時点の最新週の価格</b>を使います（試合直後の精算を想定した割り切り仕様。週ごとの価格差は通常±1〜2円/Lで、精算額への影響は数十円未満）</li>
         <li>丸め方：ガソリン代を1円単位に四捨五入 → 高速代と合計して10円単位に四捨五入 ／ 一人あたりは10円単位に切り上げ</li>
       </ul>
       <div class="info" style="margin-top:8px;">
@@ -627,16 +628,21 @@
   }
 
   // ---------- NAVITIME (RapidAPI・正確な高速料金) ----------
-  async function routeNavitime(from, to, key) {
+  // startTime: 出発日時（試合の日付+朝8時）。ETC休日割引の判定に使われる。
+  // 時刻は必須仕様のため8:00固定（0〜4時を渡すと深夜割引が誤適用されるので避ける）
+  async function routeNavitime(from, to, key, startTime) {
     const base =
       "https://navitime-route-car.p.rapidapi.com/route_car" +
       `?start=${from.lat}%2C${from.lon}&goal=${to.lat}%2C${to.lon}`;
+    const st = startTime ? "&start_time=" + encodeURIComponent(startTime) : "";
     const headers = {
       "X-RapidAPI-Key": key,
       "X-RapidAPI-Host": "navitime-route-car.p.rapidapi.com",
     };
-    // 有料道路優先・時間重視。条件パラメータが拒否されたら条件なしで再試行
-    let r = await fetchTimeout(base + "&condition=toll_time", { headers });
+    // 有料道路優先・時間重視。パラメータが拒否されたら段階的に外して再試行
+    let r = await fetchTimeout(base + "&condition=toll_time" + st, { headers });
+    if ((r.status === 400 || r.status === 422) && st)
+      r = await fetchTimeout(base + "&condition=toll_time", { headers });
     if (r.status === 400 || r.status === 422) r = await fetchTimeout(base, { headers });
     if (!r.ok) {
       const reasons = {
@@ -755,9 +761,12 @@
       return;
     }
     st.innerHTML = '<span class="spinner"></span>NAVITIMEで最新ルートを取得中…';
+    // 試合の日付の朝8時出発として料金計算（土日祝ならETC休日割引が反映される）
+    const dateVal = $("calcDate").value;
+    const startTime = /^\d{4}-\d{2}-\d{2}$/.test(dateVal) ? dateVal + "T08:00:00" : null;
     let r;
     try {
-      r = await routeNavitime(mp, place, key);
+      r = await routeNavitime(mp, place, key, startTime);
     } catch (e) {
       if (seq !== routeReqSeq) return;  // すでに別の会場がタップされている
       const msg = (e && e.message) ? e.message : String(e);
@@ -769,7 +778,7 @@
     }
     if (seq !== routeReqSeq) return;  // 古い応答は破棄（会場名と金額の食い違い防止）
     const km = Math.round(r.km * 10) / 10;
-    lastRoute = { name: place.name, km, toll: r.toll, ics: r.ics || [] };
+    lastRoute = { name: place.name, lat: place.lat, lon: place.lon, km, toll: r.toll, ics: r.ics || [] };
     $("calcKm").value = km;
     $("calcEtc").value = r.toll;
     $("venueCands").innerHTML = "";
@@ -781,7 +790,7 @@
     st.innerHTML =
       `✅ <b>${escapeHtml(place.name)}</b>：片道 ${km}km・約${r.min}分` +
       (r.toll > 0 ? `・高速代 ${yen(r.toll)}（片道・NAVITIME実額）` : "・高速なし") +
-      "（いま時点の最新ルート）" + icChain + " ／ " +
+      (startTime ? "（試合日のETC割引を反映）" : "（いま時点の最新ルート）") + icChain + " ／ " +
       `<a href="https://www.google.com/maps/dir/?api=1&origin=${mp.lat},${mp.lon}&destination=${place.lat},${place.lon}&travelmode=driving" target="_blank" rel="noopener">地図で距離を照合</a>`;
     recalc();
   }
@@ -799,6 +808,14 @@
       box.appendChild(b);
     });
   }
+
+  // 試合の日付を変えたら、取得済みルートを新しい日付の割引条件で取り直す
+  // （日付でETC休日割引が変わるため、古い料金が残らないようにする）
+  $("calcDate").addEventListener("change", () => {
+    if (lastRoute && $("calcVenueName").value.trim() === lastRoute.name) {
+      fetchRouteFor({ name: lastRoute.name, lat: lastRoute.lat, lon: lastRoute.lon });
+    }
+  });
 
   $("venueSearchBtn").addEventListener("click", searchVenues);
   $("venueQuery").addEventListener("keydown", (e) => {
@@ -979,7 +996,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.11";
+  const APP_VERSION = "2.12";
   let lastGasApplied = null;
 
   function refresh() {
