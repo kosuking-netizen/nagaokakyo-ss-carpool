@@ -427,17 +427,6 @@
     </div>
 
     <div class="card">
-      <h2>管理者向け：共有データの更新方法</h2>
-      <ol class="info">
-        <li>GitHubで <a href="https://github.com/kosuking-netizen/nagaokakyo-ss-carpool/blob/master/data.js" target="_blank" rel="noopener"><b>data.js</b></a>（集合場所など）または
-          <a href="https://github.com/kosuking-netizen/nagaokakyo-ss-carpool/blob/master/key.js" target="_blank" rel="noopener"><b>key.js</b></a>（チーム共有APIキー）を開く</li>
-        <li>鉛筆マーク（Edit）を押す</li>
-        <li>書き換える（ガソリン価格は自動更新なので触らなくてOK）</li>
-        <li>「Commit changes」を押す → 数分で全員のアプリに反映</li>
-      </ol>
-    </div>
-
-    <div class="card">
       <h2>免責事項</h2>
       <ul class="info">
         <li>本アプリは商用サービスではなく、保護者が無償で運営する<b>チーム内の精算補助ツール</b>です</li>
@@ -448,6 +437,7 @@
     </div>
 
     <footer>
+      作成・運営：井沢（チーム保護者）<br>
       データ更新日：<span id="dataUpdated"></span> ／ アプリ版：<span id="appVersion"></span><br>
       会場検索・ルート・高速料金：NAVITIME ／ 住所検索：国土地理院 ／ © OpenStreetMap contributors<br>
       本アプリは非商用の補助ツールです。金額をご確認のうえご利用ください<br>
@@ -967,7 +957,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.6";
+  const APP_VERSION = "2.7";
   let lastGasApplied = null;
 
   function refresh() {
