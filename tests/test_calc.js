@@ -26,7 +26,7 @@ c = calcSettlement({ ...base, km: 7, etc: 0, gas: 162.5 });
 assert.strictEqual(c.totalRaw, 345); // 14÷7×172.5 = 345
 assert.strictEqual(c.total, 350);
 
-// 一人あたりの切り上げ（1020÷4=255 → そのまま260ではなく…255→260）
+// 一人あたりの切り上げ（1020÷4=255 → 10円単位に切り上げて260）
 c = calcSettlement({ ...base, km: 10, etc: 255, gas: 170, pax: 4 });
 assert.strictEqual(c.total, 1020);  // 514+510=1024 → 1020
 assert.strictEqual(c.per, 260);     // 1020÷4=255 → 10円切り上げで260

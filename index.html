@@ -80,7 +80,7 @@
   }
   label.field { display: block; font-size: 13px; font-weight: 600; color: var(--gray); margin: 12px 0 4px; }
   label.field:first-of-type { margin-top: 0; }
-  select, input[type="number"], input[type="date"], input[type="text"], input[type="search"], input[type="password"] {
+  input[type="number"], input[type="date"], input[type="text"], input[type="search"], input[type="password"] {
     width: 100%;
     padding: 10px 12px;
     font-size: 16px;
@@ -89,7 +89,7 @@
     background: #fff;
     color: var(--navy);
   }
-  select:focus, input:focus { outline: 2px solid var(--green); border-color: var(--green); }
+  input:focus { outline: 2px solid var(--green); border-color: var(--green); }
 
   .row { display: flex; gap: 10px; }
   .row > div { flex: 1; }
@@ -230,15 +230,6 @@
   }
   .toast.show { opacity: 1; }
 
-  .hint {
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 13px;
-    color: #78350f;
-    margin-top: 10px;
-  }
   .warn {
     background: #fef2f2;
     border: 1px solid #fecaca;
@@ -489,8 +480,13 @@
     );
   }
 
+  // localStorageが使えない環境（プライベートブラウズ等）でもアプリ全体は動くようにする
+  function lsGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch {} }
+
   function gasOverride() {
-    try { return JSON.parse(localStorage.getItem(LS_GAS)); }
+    try { return JSON.parse(lsGet(LS_GAS)); }
     catch { return null; }
   }
   function effectiveGasPrice() {
@@ -500,18 +496,18 @@
   const KEY_CLEAN_RE = new RegExp("[\\s\\u200B-\\u200D\\uFEFF]", "g");
   function apiKey() {
     // 空白・不可視文字（ゼロ幅スペース等）が混ざって保存されていても除去して使う
-    return (localStorage.getItem(LS_APIKEY) || "").replace(KEY_CLEAN_RE, "");
+    return (lsGet(LS_APIKEY) || "").replace(KEY_CLEAN_RE, "");
   }
 
   // 最近使った会場（名前と座標のみ保存。ルート・料金は毎回取り直す）
   function venueHistory() {
-    try { return JSON.parse(localStorage.getItem(LS_HISTORY)) || []; }
+    try { return JSON.parse(lsGet(LS_HISTORY)) || []; }
     catch { return []; }
   }
   function pushHistory(place) {
     const list = venueHistory().filter((h) => h.name !== place.name);
     list.unshift({ name: place.name, lat: place.lat, lon: place.lon });
-    localStorage.setItem(LS_HISTORY, JSON.stringify(list.slice(0, HISTORY_MAX)));
+    lsSet(LS_HISTORY, JSON.stringify(list.slice(0, HISTORY_MAX)));
     renderHistory();
   }
 
@@ -595,9 +591,9 @@
       "X-RapidAPI-Key": key,
       "X-RapidAPI-Host": "navitime-route-car.p.rapidapi.com",
     };
-    // 有料道路優先・時間重視。条件パラメータ非対応なら条件なしで再試行
+    // 有料道路優先・時間重視。条件パラメータが拒否されたら条件なしで再試行
     let r = await fetchTimeout(base + "&condition=toll_time", { headers });
-    if (r.status === 400) r = await fetchTimeout(base, { headers });
+    if (r.status === 400 || r.status === 422) r = await fetchTimeout(base, { headers });
     if (!r.ok) {
       const reasons = {
         401: "APIキーが正しくありません。設定タブでキーを確認してください",
@@ -652,6 +648,7 @@
     const q = $("venueQuery").value.trim();
     if (!q) { toast("会場名か住所を入力してください"); return; }
     const box = $("venueCands");
+    $("routeStatus").innerHTML = "";  // 前の会場の取得結果表示を消す
     box.innerHTML = '<div class="info"><span class="spinner"></span>検索中…</div>';
     try {
       const cands = await geocode(q);
@@ -674,10 +671,18 @@
     }
   }
 
+  // 連続タップ対策：最後にタップされた会場のリクエストだけを有効にする世代番号
+  let routeReqSeq = 0;
+
   async function fetchRouteFor(place) {
     const mp = D.meetingPoint;
     const st = $("routeStatus");
+    const seq = ++routeReqSeq;
     $("calcVenueName").value = place.name;
+    // 前の会場の距離・料金が残ったまま誤って精算されるのを防ぐため、まずクリア
+    $("calcKm").value = "";
+    $("calcEtc").value = "";
+    recalc();
     const key = apiKey();
     if (!key) {
       st.innerHTML =
@@ -689,6 +694,7 @@
     try {
       r = await routeNavitime(mp, place, key);
     } catch (e) {
+      if (seq !== routeReqSeq) return;  // すでに別の会場がタップされている
       const msg = (e && e.message) ? e.message : String(e);
       console.warn("NAVITIME取得失敗:", msg);
       st.innerHTML =
@@ -696,6 +702,7 @@
         "再試行するか、距離・料金を手入力してください。";
       return;
     }
+    if (seq !== routeReqSeq) return;  // 古い応答は破棄（会場名と金額の食い違い防止）
     const km = Math.round(r.km * 10) / 10;
     $("calcKm").value = km;
     $("calcEtc").value = r.toll;
@@ -724,7 +731,10 @@
   }
 
   $("venueSearchBtn").addEventListener("click", searchVenues);
-  $("venueQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") searchVenues(); });
+  $("venueQuery").addEventListener("keydown", (e) => {
+    // 日本語入力の変換確定Enter（isComposing / keyCode 229）では検索しない
+    if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) searchVenues();
+  });
 
   // ---------- 計算 ----------
   function calcValues() {
@@ -847,13 +857,13 @@
   $("gasSaveBtn").addEventListener("click", () => {
     const p = parseFloat($("gasOverrideInput").value);
     if (!(p > 0)) { toast("価格を入力してください"); return; }
-    localStorage.setItem(LS_GAS, JSON.stringify({ price: p, savedAt: new Date().toISOString() }));
+    lsSet(LS_GAS, JSON.stringify({ price: p, savedAt: new Date().toISOString() }));
     $("gasOverrideInput").value = "";
     refresh();
     toast("上書きしました");
   });
   $("gasClearBtn").addEventListener("click", () => {
-    localStorage.removeItem(LS_GAS);
+    lsDel(LS_GAS);
     refresh();
     toast("自動更新の価格に戻しました");
   });
@@ -877,19 +887,19 @@
       toast("キーに全角文字が混ざっています。コピーし直してください");
       return;
     }
-    localStorage.setItem(LS_APIKEY, k);
+    lsSet(LS_APIKEY, k);
     $("apiKeyInput").value = "";
     refresh();
     toast("APIキーを保存しました");
   });
   $("apiKeyClearBtn").addEventListener("click", () => {
-    localStorage.removeItem(LS_APIKEY);
+    lsDel(LS_APIKEY);
     refresh();
     toast("APIキーを削除しました");
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.0";
+  const APP_VERSION = "2.1";
   let lastGasApplied = null;
 
   function refresh() {
@@ -903,6 +913,9 @@
     lastGasApplied = g;
     recalc();
   }
+
+  // 旧バージョン（会場マスタ方式）が残したデータを掃除
+  lsDel("nss_localVenues");
 
   $("appVersion").textContent = APP_VERSION;
   $("headerSub").textContent =
