@@ -2,7 +2,7 @@
   "name": "長岡京SS 配車交通費精算",
   "short_name": "SS精算",
   "start_url": ".",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#f4f6f5",
   "theme_color": "#1a7a4a",
   "icons": [
