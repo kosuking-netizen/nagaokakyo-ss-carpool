@@ -220,16 +220,28 @@
   .spinner::before { content: "⚽"; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* コピー成功時のゴール演出 */
+  /* コピー成功時のゴール演出（⚽がゴールマウスに吸い込まれ、ネットが揺れる） */
   #goalFx { position: fixed; inset: 0; pointer-events: none; z-index: 300; display: none; }
-  #goalFx .goal { position: absolute; right: 6px; top: 36%; font-size: 46px; }
+  #goalFx .goal {
+    position: absolute; right: 6px; top: 34%; font-size: 52px;
+    animation: goalshake 0.3s 0.66s;
+  }
   #goalFx .ball {
-    position: absolute; left: -50px; top: 58%; font-size: 34px;
+    position: absolute; left: -40px; top: 58%; font-size: 30px;
     animation: shoot 0.85s cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
   }
+  /* ボールの中心がゴール絵文字の中心に一致する位置まで飛び、
+     ネットの奥へ（縮小＋フェード）吸い込まれる。ゴールはボールより後に
+     描画されるためネットが手前に見える */
   @keyframes shoot {
-    0%   { transform: translate(0, 0) rotate(0deg); }
-    100% { transform: translate(calc(100vw - 30px), -20vh) rotate(720deg); }
+    0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    80%  { transform: translate(calc(100vw - 7px), calc(-24vh + 10px)) rotate(660deg); opacity: 1; }
+    100% { transform: translate(calc(100vw - 7px), calc(-24vh + 10px)) rotate(720deg) scale(0.35); opacity: 0; }
+  }
+  @keyframes goalshake {
+    0%, 100% { transform: none; }
+    40% { transform: rotate(-7deg) scale(1.08); }
+    70% { transform: rotate(4deg); }
   }
   #goalFx .goalText {
     position: absolute; left: 50%; top: 28%;
@@ -1042,7 +1054,7 @@
   function goalAnimation() {
     const fx = $("goalFx");
     fx.innerHTML =
-      '<span class="goal">🥅</span><span class="ball">⚽</span><span class="goalText">ゴール！</span>';
+      '<span class="ball">⚽</span><span class="goal">🥅</span><span class="goalText">ゴール！</span>';
     fx.style.display = "block";
     clearTimeout(goalFxTimer);
     goalFxTimer = setTimeout(() => {
@@ -1127,7 +1139,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.18";
+  const APP_VERSION = "2.19";
   let lastGasApplied = null;
 
   function refresh() {
