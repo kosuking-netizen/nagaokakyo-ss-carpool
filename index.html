@@ -43,6 +43,9 @@
     position: sticky;
     top: 0;
     z-index: 10;
+    /* iOS WebKitでsticky要素と画面下側の再描画が乱れる既知バグの回避
+       （独立した描画レイヤーに分離する定番のワークアラウンド） */
+    transform: translateZ(0);
   }
   nav button {
     flex: 1;
@@ -996,7 +999,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.12";
+  const APP_VERSION = "2.13";
   let lastGasApplied = null;
 
   function refresh() {
