@@ -1,0 +1,19 @@
+name: テスト・データ検証
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 共有データ（data.js）の検証
+        run: node scripts/validate_data.js
+
+      - name: 精算計算の自動テスト
+        run: node tests/test_calc.js

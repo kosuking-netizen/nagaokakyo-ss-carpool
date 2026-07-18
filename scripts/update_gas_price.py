@@ -9,10 +9,14 @@ import io
 import re
 import sys
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 URL = "https://oil-stat.com/reg/%E4%BA%AC%E9%83%BD%E5%BA%9C.html"
 DATA_JS = "data.js"
+
+# 安全装置のしきい値
+MAX_WEEKLY_JUMP = 15.0   # 前回価格からの変動がこれ（円/L）を超えたら異常として停止
+MAX_WEEK_AGE_DAYS = 21   # 調査週がこれより古いデータしか取れなければ異常として停止
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
@@ -44,6 +48,26 @@ def fetch_price():
 def update_data_js(price, week):
     with open(DATA_JS, encoding="utf-8") as f:
         src = f.read()
+
+    # 安全装置1: 調査週が古すぎないか（取得元が更新停止している兆候）
+    wy, wm, wd = (int(x) for x in week.split("-"))
+    age = (date.today() - date(wy, wm, wd)).days
+    if age > MAX_WEEK_AGE_DAYS:
+        raise RuntimeError(
+            "取得できた調査週(%s)が%d日前と古すぎます。取得元の更新が止まっている可能性" % (week, age)
+        )
+
+    # 安全装置2: 前回価格からの急変を検知（誤った値の取り込み防止）
+    m = re.search(r"price: ([\d.]+), // \[AUTO-GAS-PRICE\]", src)
+    if not m:
+        raise RuntimeError("data.js に [AUTO-GAS-PRICE] マーカーが見つかりません")
+    old_price = float(m.group(1))
+    if abs(price - old_price) > MAX_WEEKLY_JUMP:
+        raise RuntimeError(
+            "価格が前回(%s円)から%s円へ急変しています（差%.1f円 > %.0f円）。"
+            "取得ミスの可能性があるため更新を停止。正しければ data.js を手動更新してください"
+            % (old_price, price, abs(price - old_price), MAX_WEEKLY_JUMP)
+        )
 
     new = re.sub(
         r"price: [\d.]+, // \[AUTO-GAS-PRICE\]",

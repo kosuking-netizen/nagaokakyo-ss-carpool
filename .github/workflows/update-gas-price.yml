@@ -19,6 +19,9 @@ jobs:
       - name: 価格を取得して data.js を更新
         run: python3 scripts/update_gas_price.py
 
+      - name: 更新後の data.js を検証
+        run: node scripts/validate_data.js
+
       - name: 変更があればコミットしてPages再ビルド
         env:
           GH_TOKEN: ${{ github.token }}

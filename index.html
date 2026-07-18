@@ -235,6 +235,15 @@
     color: #78350f;
     margin-top: 10px;
   }
+  .warn {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #7f1d1d;
+    margin-top: 10px;
+  }
   .ok-box {
     background: var(--green-light);
     border: 1px solid #bcd9c8;
@@ -309,6 +318,7 @@
           <tr class="per" id="rPerRow" style="display:none;"><td>一人あたり<span style="font-size:11px;color:var(--gray);">（10円切上げ）</span></td><td id="rPer"></td></tr>
         </table>
         <div class="note" id="rNote"></div>
+        <div class="warn" id="rWarn" style="display:none;"></div>
       </div>
 
       <button class="btn btn-primary" id="copyBtn" style="display:none;">精算結果をコピー（LINE用）</button>
@@ -439,6 +449,18 @@
     </div>
 
     <div class="card">
+      <h2>安全のしくみ</h2>
+      <ul class="info">
+        <li><b>計算式の自動テスト</b>：計算ロジックは更新のたびにGitHubが自動検証（期待値と1円でも違えば通知）</li>
+        <li><b>共有データの自動検証</b>：data.jsの編集ミス（構文エラー・異常な価格や距離）はpush時に自動チェックで検出</li>
+        <li><b>価格急変の停止装置</b>：ガソリン価格の自動取得値が前週から15円超変動したら、誤取得とみなし更新を停止して管理者に通知</li>
+        <li><b>画面上の警告</b>：価格・距離・高速代・人数が通常範囲を外れると計算結果に警告を表示</li>
+        <li><b>変更履歴</b>：価格・会場マスタの変更はすべてGitHubに記録され、いつでも遡って確認可能</li>
+        <li><b>計算根拠の明示</b>：LINEコピー文に単価・距離・燃費を含めるため、受け取った人も検算可能</li>
+      </ul>
+    </div>
+
+    <div class="card">
       <h2>管理者向け：共有データの更新方法</h2>
       <ol class="info">
         <li>GitHubで <a href="https://github.com/kosuking-netizen/nagaokakyo-ss-carpool/blob/master/data.js" target="_blank" rel="noopener"><b>data.js</b></a> を開く</li>
@@ -460,9 +482,17 @@
 <div class="toast" id="toast"></div>
 
 <script src="data.js"></script>
+<script src="calc.js"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
+  // 共有データが壊れている場合は誤計算を防ぐため画面全体を止める
+  if (!D || !D.gasPrice || !Array.isArray(D.venues) || !window.NSS_CALC) {
+    document.querySelector("main").innerHTML =
+      '<div class="card"><h2 style="color:#b91c1c;">データ読み込みエラー</h2>' +
+      '<div class="info">共有データ（data.js）が壊れている可能性があります。計算を停止しました。管理者（井沢さん）に連絡してください。</div></div>';
+    return;
+  }
   const LS_VENUES = "nss_localVenues";
   const LS_GAS = "nss_gasOverride";
   const LS_APIKEY = "nss_rapidApiKey";
@@ -679,19 +709,36 @@
   }
 
   function calcValues() {
-    const km = parseFloat($("calcKm").value);
-    const etc = parseFloat($("calcEtc").value) || 0;
-    const gas = parseFloat($("calcGas").value);
-    const pax = parseInt($("calcPax").value, 10) || 0;
-    if (!(km > 0) || !(gas > 0)) return null;
-    const rtKm = km * 2;
-    const unit = gas + D.gasSurcharge;
-    const fuel = Math.round((rtKm / D.fuelEfficiency) * unit);
-    const toll = Math.round(etc * 2);
-    const totalRaw = fuel + toll;
-    const total = Math.round(totalRaw / 10) * 10;
-    const per = pax >= 2 ? Math.ceil(total / pax / 10) * 10 : null;
-    return { km, etc, gas, pax, rtKm, unit, fuel, toll, totalRaw, total, per };
+    // 計算本体は calc.js（自動テスト済みの純関数）に委譲
+    return window.NSS_CALC.calcSettlement({
+      km: $("calcKm").value,
+      etc: $("calcEtc").value,
+      gas: $("calcGas").value,
+      pax: $("calcPax").value,
+      fuelEfficiency: D.fuelEfficiency,
+      gasSurcharge: D.gasSurcharge,
+    });
+  }
+
+  // ガソリン価格データの古さ（日数）。週次更新が止まっていれば警告に使う
+  function gasWeekAgeDays() {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(D.gasPrice.week || "");
+    if (!m) return null;
+    return Math.floor((Date.now() - new Date(+m[1], +m[2] - 1, +m[3]).getTime()) / 86400000);
+  }
+
+  // 入力・データの異常を検知して警告文のリストを返す（計算は止めない）
+  function calcWarnings(c) {
+    const w = [];
+    if (c.gas < 120 || c.gas > 250) w.push("ガソリン価格が通常の範囲（120〜250円/L）を外れています。入力を確認してください。");
+    if (c.km > 150) w.push("片道150kmを超えています。距離の入力を確認してください。");
+    if (c.etc > 0 && c.etc / c.km > 60) w.push("距離のわりに高速代が高すぎるようです。入力を確認してください。");
+    if (c.pax > 10) w.push("乗車人数が10人を超えています。入力を確認してください。");
+    const age = gasWeekAgeDays();
+    if (age != null && age > 10 && !gasOverride()) {
+      w.push(`ガソリン価格が${age}日前の週のデータです。自動更新が止まっている可能性があるため、設定タブから最新価格を確認してください。`);
+    }
+    return w;
   }
 
   function recalc() {
@@ -715,6 +762,14 @@
     }
     $("rNote").textContent =
       `単価 ${c.gas.toFixed(1)}＋10＝${c.unit.toFixed(1)}円/L ／ 燃費7km/L ／ 精算額は10円単位に四捨五入（丸め前 ${yen(c.totalRaw)}）`;
+    const warns = calcWarnings(c);
+    const wBox = $("rWarn");
+    if (warns.length) {
+      wBox.innerHTML = warns.map((t) => "⚠ " + escapeHtml(t)).join("<br>");
+      wBox.style.display = "block";
+    } else {
+      wBox.style.display = "none";
+    }
     box.style.display = "block";
     btn.style.display = "block";
   }
@@ -814,7 +869,8 @@
     st.innerHTML =
       `✅ <b>${escapeHtml(c.name)}</b>：片道 ${km}km・約${r.min}分` +
       (r.toll > 0 ? `・高速代 ${yen(r.toll)}（片道・NAVITIME実額）` : "・高速なし") +
-      " → 下の内容を確認して保存してください";
+      " → 下の内容を確認して保存してください ／ " +
+      `<a href="https://www.google.com/maps/dir/?api=1&origin=${mp.lat},${mp.lon}&destination=${c.lat},${c.lon}&travelmode=driving" target="_blank" rel="noopener">地図で距離を照合</a>`;
   }
 
   $("venueSearchBtn").addEventListener("click", searchVenues);
@@ -958,7 +1014,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "1.1";
+  const APP_VERSION = "1.2";
   let lastGasApplied = null;
 
   function refresh() {
