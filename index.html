@@ -77,7 +77,7 @@
   }
   label.field { display: block; font-size: 13px; font-weight: 600; color: var(--gray); margin: 12px 0 4px; }
   label.field:first-of-type { margin-top: 0; }
-  select, input[type="number"], input[type="date"], input[type="text"] {
+  select, input[type="number"], input[type="date"], input[type="text"], input[type="search"], input[type="password"] {
     width: 100%;
     padding: 10px 12px;
     font-size: 16px;
@@ -107,6 +107,11 @@
     font-weight: 700;
     color: var(--green-dark);
   }
+  .result .per td {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--navy);
+  }
   .result .note { font-size: 12px; color: var(--gray); margin-top: 8px; }
 
   .btn {
@@ -122,7 +127,6 @@
   }
   .btn-primary { background: var(--green); color: #fff; }
   .btn-primary:active { background: var(--green-dark); }
-  .btn-secondary { background: #fff; color: var(--green-dark); border: 2px solid var(--green); }
   .btn-small {
     padding: 8px 14px;
     font-size: 13px;
@@ -158,6 +162,32 @@
   .venue-item .vname { font-weight: 700; font-size: 15px; }
   .venue-item .vdetail { color: var(--gray); font-size: 13px; margin-top: 2px; }
 
+  .cand-list { margin-top: 10px; }
+  .cand-item {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    background: #fff;
+  }
+  .cand-item:active, .cand-item:hover { background: var(--green-light); border-color: var(--green); }
+  .cand-item .cname { font-weight: 700; }
+  .cand-item .caddr { font-size: 12px; color: var(--gray); }
+
+  .spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid var(--green-light);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: -3px;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   .info { font-size: 13px; color: var(--gray); }
   .info a { color: var(--green-dark); }
   .info li { margin-left: 1.3em; margin-bottom: 4px; }
@@ -187,6 +217,9 @@
     pointer-events: none;
     z-index: 100;
     white-space: nowrap;
+    max-width: 92vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .toast.show { opacity: 1; }
 
@@ -197,6 +230,15 @@
     padding: 10px 12px;
     font-size: 13px;
     color: #78350f;
+    margin-top: 10px;
+  }
+  .ok-box {
+    background: var(--green-light);
+    border: 1px solid #bcd9c8;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--green-dark);
     margin-top: 10px;
   }
   footer {
@@ -244,8 +286,16 @@
         </div>
       </div>
 
-      <label class="field">ガソリン価格（円/L・京都府 週次平均）</label>
-      <input type="number" id="calcGas" step="0.1" min="0" inputmode="decimal">
+      <div class="row" style="margin-top:12px;">
+        <div>
+          <label class="field">ガソリン価格（円/L）</label>
+          <input type="number" id="calcGas" step="0.1" min="0" inputmode="decimal">
+        </div>
+        <div>
+          <label class="field">乗車人数（運転者含む）</label>
+          <input type="number" id="calcPax" step="1" min="1" inputmode="numeric" placeholder="例：4">
+        </div>
+      </div>
 
       <div class="result" id="resultBox" style="display:none;">
         <table>
@@ -253,6 +303,7 @@
           <tr><td>ガソリン代 <span style="font-size:11px;color:var(--gray);">(往復÷7km/L×単価+10円)</span></td><td id="rFuel"></td></tr>
           <tr><td>高速代（ETC往復）</td><td id="rToll"></td></tr>
           <tr class="total"><td>精算額</td><td id="rTotal"></td></tr>
+          <tr class="per" id="rPerRow" style="display:none;"><td>一人あたり<span style="font-size:11px;color:var(--gray);">（10円切上げ）</span></td><td id="rPer"></td></tr>
         </table>
         <div class="note" id="rNote"></div>
       </div>
@@ -264,21 +315,29 @@
   <!-- ============ 会場マスタ ============ -->
   <section id="tab-venues">
     <div class="card">
-      <h2>登録済みの会場</h2>
-      <div id="venueList"></div>
+      <h2>会場を検索して自動登録</h2>
+      <div class="info">
+        会場名や住所を入れて検索すると、集合場所（<b id="meetingPointName2"></b>）からの
+        <b>距離・所要時間・高速料金</b>を自動で取得します。<br>
+        料金取得モード：<span id="routeModeInfo"></span>
+      </div>
+
+      <label class="field" style="margin-top:12px;">会場名・住所で検索</label>
+      <div class="row">
+        <div><input type="search" id="venueQuery" placeholder="例：太陽が丘 / 丹波自然運動公園"></div>
+        <div style="flex:0 0 auto;">
+          <button class="btn-small" id="venueSearchBtn" style="margin-top:0;padding:11px 16px;">検索</button>
+        </div>
+      </div>
+      <div class="cand-list" id="venueCands"></div>
+      <div id="routeStatus" class="info" style="margin-top:8px;"></div>
     </div>
 
     <div class="card">
-      <h2>会場を追加する</h2>
-      <div class="info" style="margin-bottom:10px;">
-        <b>調べ方（無料・初回の1回だけ）：</b>
-        <a href="https://www.navitime.co.jp/" target="_blank" rel="noopener">NAVITIME</a>
-        のサイト/アプリで「<span id="meetingPointName2"></span> → 会場」を車ルートで検索し、
-        <b>時間が最短のルート</b>の「距離」と「ETC料金」（どちらも片道）をメモして下に入力。
-      </div>
+      <h2>登録内容の確認・保存</h2>
 
       <label class="field">会場名</label>
-      <input type="text" id="newName" placeholder="例：太陽が丘（山城総合運動公園）">
+      <input type="text" id="newName" placeholder="検索から自動入力（手入力も可）">
 
       <div class="row" style="margin-top:12px;">
         <div>
@@ -292,7 +351,12 @@
       </div>
 
       <label class="field">メモ（任意）</label>
-      <input type="text" id="newMemo" placeholder="例：京滋バイパス経由">
+      <input type="text" id="newMemo" placeholder="自動入力：所要時間・料金の取得元など">
+
+      <div class="hint" id="tollHint" style="display:none;">
+        高速代は<b>概算</b>です（NEXCO普通車の料金式で自動計算）。設定タブでNAVITIME APIキーを
+        設定すると正確な料金が取れます。実際に走った後、ETC明細の実額に直すこともできます。
+      </div>
 
       <button class="btn btn-primary" id="addVenueBtn">この端末に保存する</button>
 
@@ -302,6 +366,11 @@
         出てきたテキストを管理者（井沢さん）にLINE等で送ってください。
       </div>
       <button class="btn-small" id="exportBtn">共有データ用にコピー</button>
+    </div>
+
+    <div class="card">
+      <h2>登録済みの会場</h2>
+      <div id="venueList"></div>
     </div>
   </section>
 
@@ -315,12 +384,11 @@
         <span class="badge" id="gasBadge"></span>
       </div>
       <div class="info" id="gasWeekInfo"></div>
+      <div class="ok-box">
+        価格は<b>毎週水曜の夜に自動更新</b>されます（京都府平均・レギュラー）。手作業は不要です。
+      </div>
       <div class="info" style="margin-top:10px;">
-        最新価格の確認はこちら（毎週水曜ごろ更新）：
-        <ul>
-          <li><a href="https://www.enecho.meti.go.jp/statistics/petroleum_and_lpgas/pl007/results.html" target="_blank" rel="noopener">資源エネルギー庁 石油製品価格調査</a>（公式）</li>
-          <li><a href="https://oil-stat.com/reg/%E4%BA%AC%E9%83%BD%E5%BA%9C.html" target="_blank" rel="noopener">京都府レギュラー価格（週次・見やすい）</a></li>
-        </ul>
+        参考：<a href="https://www.enecho.meti.go.jp/statistics/petroleum_and_lpgas/pl007/results.html" target="_blank" rel="noopener">資源エネルギー庁 石油製品価格調査</a>／<a href="https://oil-stat.com/reg/%E4%BA%AC%E9%83%BD%E5%BA%9C.html" target="_blank" rel="noopener">京都府の週次価格</a>
       </div>
 
       <label class="field">この端末での価格上書き（円/L）</label>
@@ -331,20 +399,44 @@
           <button class="btn-small btn-danger-text" id="gasClearBtn" style="margin-top:0;padding:11px 12px;">解除</button>
         </div>
       </div>
-      <div class="info" style="margin-top:6px;">共有データより新しい価格が出ていたらここで上書きできます。</div>
+      <div class="info" style="margin-top:6px;">自動更新より新しい価格を使いたいときだけ上書きしてください。</div>
+    </div>
+
+    <div class="card">
+      <h2>NAVITIME APIキー（管理者用）</h2>
+      <div class="info">
+        状態：<span class="badge" id="apiKeyBadge"></span><br>
+        キーを設定すると、会場登録時に<b>NAVITIMEの正確な高速料金（ETC・普通車）と距離</b>を自動取得します。
+        未設定でも無料ルート検索＋概算料金で動作します。
+      </div>
+      <div class="info" style="margin-top:8px;">
+        キーは <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-totalnavi" target="_blank" rel="noopener">RapidAPIのNAVITIME Route(totalnavi)</a> で無料取得できます
+        （月500回まで・超過は停止するだけで自動課金なし・クレジットカード不要）。
+        キーは<b>この端末の中だけ</b>に保存され、他の人には見えません。
+      </div>
+      <label class="field">APIキー（X-RapidAPI-Key）</label>
+      <div class="row">
+        <div><input type="password" id="apiKeyInput" placeholder="RapidAPIで取得したキーを貼り付け"></div>
+        <div style="flex:0 0 auto;">
+          <button class="btn-small" id="apiKeySaveBtn" style="margin-top:0;padding:11px 16px;">保存</button>
+          <button class="btn-small btn-danger-text" id="apiKeyClearBtn" style="margin-top:0;padding:11px 12px;">削除</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
       <h2>精算ルール</h2>
       <ul class="info">
-        <li>集合場所：<b id="meetingPointName"></b> から会場までの、NAVITIMEの<b>時間最短ルート</b>で計算</li>
+        <li>集合場所：<b>ローソン長岡京インター店</b> → 会場の<b>時間最短ルート</b>（有料道路優先）</li>
         <li>距離・ETC料金は<b>往復分</b>（片道の2倍）</li>
         <li>燃費は <b>7km/L</b> で統一</li>
-        <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」</li>
-        <li>精算額は10円単位に四捨五入</li>
+        <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」（毎週水曜夜に自動更新）</li>
+        <li>高速料金はNAVITIME（ETC・普通車）。APIキー未設定時は概算→実額修正可</li>
+        <li>精算額は10円単位に四捨五入、一人あたりは10円単位に切り上げ</li>
       </ul>
       <div class="info" style="margin-top:8px;">
-        計算式：<b>精算額 ＝ 往復距離 ÷ 7 ×（週次価格＋10円）＋ ETC片道×2</b>
+        計算式：<b>精算額 ＝ 往復距離 ÷ 7 ×（週次価格＋10円）＋ ETC片道×2</b><br>
+        一人あたり ＝ 精算額 ÷ 乗車人数（10円単位切り上げ）
       </div>
     </div>
 
@@ -353,7 +445,7 @@
       <ol class="info">
         <li>GitHubでこのリポジトリの <b>data.js</b> を開く</li>
         <li>鉛筆マーク（Edit）を押す</li>
-        <li>ガソリン価格（price と week）や会場（venues）を書き換える</li>
+        <li>会場（venues）などを書き換える（ガソリン価格は自動更新なので触らなくてOK）</li>
         <li>「Commit changes」を押す → 数分で全員のアプリに反映</li>
       </ol>
     </div>
@@ -371,6 +463,7 @@
   const D = window.APP_DATA;
   const LS_VENUES = "nss_localVenues";
   const LS_GAS = "nss_gasOverride";
+  const LS_APIKEY = "nss_rapidApiKey";
 
   // ---------- utilities ----------
   const $ = (id) => document.getElementById(id);
@@ -380,7 +473,13 @@
     const t = $("toast");
     t.textContent = msg;
     t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 2000);
+    setTimeout(() => t.classList.remove("show"), 2500);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    );
   }
 
   function localVenues() {
@@ -398,11 +497,140 @@
     const ov = gasOverride();
     return ov ? ov.price : D.gasPrice.price;
   }
+  function apiKey() {
+    return localStorage.getItem(LS_APIKEY) || "";
+  }
   function allVenues() {
     return [
       ...D.venues.map((v) => ({ ...v, shared: true })),
       ...localVenues().map((v) => ({ ...v, shared: false })),
     ];
+  }
+
+  // ---------- free geocoding (GSI + OpenStreetMap Nominatim) ----------
+  async function geocode(q) {
+    const results = [];
+    const tasks = [
+      fetch(
+        "https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=jp&limit=5&accept-language=ja&q=" +
+          encodeURIComponent(q)
+      )
+        .then((r) => (r.ok ? r.json() : []))
+        .then((list) =>
+          list.forEach((x) =>
+            results.push({
+              name: x.name || (x.display_name || "").split(",")[0],
+              addr: x.display_name || "",
+              lat: parseFloat(x.lat),
+              lon: parseFloat(x.lon),
+            })
+          )
+        )
+        .catch(() => {}),
+      fetch(
+        "https://msearch.gsi.go.jp/address-search/AddressSearch?q=" +
+          encodeURIComponent(q)
+      )
+        .then((r) => (r.ok ? r.json() : []))
+        .then((list) =>
+          (list || []).slice(0, 5).forEach((x) =>
+            results.push({
+              name: x.properties && x.properties.title,
+              addr: (x.properties && x.properties.title) || "",
+              lat: x.geometry.coordinates[1],
+              lon: x.geometry.coordinates[0],
+            })
+          )
+        )
+        .catch(() => {}),
+    ];
+    await Promise.all(tasks);
+    const uniq = [];
+    results.forEach((r) => {
+      if (!r.name || isNaN(r.lat)) return;
+      const dup = uniq.some(
+        (u) =>
+          u.name === r.name &&
+          Math.abs(u.lat - r.lat) < 0.003 &&
+          Math.abs(u.lon - r.lon) < 0.003
+      );
+      if (!dup) uniq.push(r);
+    });
+    // 集合場所から近い順に並べ替え（遠方の同名地名を下へ）
+    const mp = D.meetingPoint;
+    uniq.sort(
+      (a, b) =>
+        (Math.abs(a.lat - mp.lat) + Math.abs(a.lon - mp.lon)) -
+        (Math.abs(b.lat - mp.lat) + Math.abs(b.lon - mp.lon))
+    );
+    return uniq.slice(0, 8);
+  }
+
+  // ---------- NAVITIME (RapidAPI・正確な高速料金) ----------
+  async function routeNavitime(from, to, key) {
+    const url =
+      "https://navitime-route-totalnavi.p.rapidapi.com/route_car" +
+      `?start=${from.lat}%2C${from.lon}&goal=${to.lat}%2C${to.lon}` +
+      "&condition=toll_time";  // 有料道路優先・時間最短
+    const r = await fetch(url, {
+      headers: {
+        "X-RapidAPI-Key": key,
+        "X-RapidAPI-Host": "navitime-route-totalnavi.p.rapidapi.com",
+      },
+    });
+    if (!r.ok) throw new Error("navitime http " + r.status);
+    const j = await r.json();
+    const item = j.items && j.items[0];
+    if (!item || !item.summary || !item.summary.move) throw new Error("navitime no route");
+    const move = item.summary.move;
+    const fare = move.fare || {};
+    // ETC普通車(unit_1025系)を優先、なければ現金(unit_1024系)
+    let toll = null;
+    for (const k of Object.keys(fare)) {
+      if (k.indexOf("unit_1025") === 0) { toll = fare[k]; break; }
+    }
+    if (toll == null) {
+      for (const k of Object.keys(fare)) {
+        if (k.indexOf("unit_1024") === 0) { toll = fare[k]; break; }
+      }
+    }
+    return {
+      km: move.distance / 1000,
+      min: move.time,
+      toll: Math.round(toll || 0),
+      src: "navitime",
+    };
+  }
+
+  // ---------- OSRM (無料フォールバック・概算料金) ----------
+  const EXPRESSWAY_RE = /(高速|自動車道|バイパス|有料|EXPWY|Expressway)|(^|[^A-Za-z])E\d+/;
+
+  async function routeOsrm(from, to) {
+    const url =
+      `https://router.project-osrm.org/route/v1/driving/` +
+      `${from.lon},${from.lat};${to.lon},${to.lat}` +
+      `?overview=false&steps=true&alternatives=false`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("route http " + r.status);
+    const j = await r.json();
+    if (j.code !== "Ok" || !j.routes || !j.routes.length) throw new Error("route not found");
+    const route = j.routes[0];
+    let hwyM = 0;
+    (route.legs || []).forEach((leg) =>
+      (leg.steps || []).forEach((s) => {
+        const label = (s.name || "") + " " + (s.ref || "");
+        if (EXPRESSWAY_RE.test(label)) hwyM += s.distance;
+      })
+    );
+    const hwyKm = hwyM / 1000;
+    // 概算：NEXCO普通車 24.6円/km + ターミナルチャージ150円、消費税10%、10円丸め
+    const toll = hwyKm < 1 ? 0 : Math.round(((150 + 24.6 * hwyKm) * 1.1) / 10) * 10;
+    return {
+      km: route.distance / 1000,
+      min: Math.round(route.duration / 60),
+      toll,
+      src: "estimate",
+    };
   }
 
   // ---------- tabs ----------
@@ -442,45 +670,50 @@
     recalc();
   }
 
-  function recalc() {
+  function calcValues() {
     const km = parseFloat($("calcKm").value);
     const etc = parseFloat($("calcEtc").value) || 0;
     const gas = parseFloat($("calcGas").value);
+    const pax = parseInt($("calcPax").value, 10) || 0;
+    if (!(km > 0) || !(gas > 0)) return null;
+    const rtKm = km * 2;
+    const unit = gas + D.gasSurcharge;
+    const fuel = Math.round((rtKm / D.fuelEfficiency) * unit);
+    const toll = Math.round(etc * 2);
+    const totalRaw = fuel + toll;
+    const total = Math.round(totalRaw / 10) * 10;
+    const per = pax >= 2 ? Math.ceil(total / pax / 10) * 10 : null;
+    return { km, etc, gas, pax, rtKm, unit, fuel, toll, totalRaw, total, per };
+  }
+
+  function recalc() {
+    const c = calcValues();
     const box = $("resultBox");
     const btn = $("copyBtn");
-    if (!(km > 0) || !(gas > 0)) {
+    if (!c) {
       box.style.display = "none";
       btn.style.display = "none";
       return;
     }
-    const rtKm = km * 2;
-    const unit = gas + D.gasSurcharge;
-    const fuelRaw = (rtKm / D.fuelEfficiency) * unit;
-    const fuel = Math.round(fuelRaw);
-    const toll = Math.round(etc * 2);
-    const totalRaw = fuel + toll;
-    const total = Math.round(totalRaw / 10) * 10;
-
-    $("rKm").textContent = rtKm.toFixed(1) + " km";
-    $("rFuel").textContent = yen(fuel);
-    $("rToll").textContent = yen(toll);
-    $("rTotal").textContent = yen(total);
+    $("rKm").textContent = c.rtKm.toFixed(1) + " km";
+    $("rFuel").textContent = yen(c.fuel);
+    $("rToll").textContent = yen(c.toll);
+    $("rTotal").textContent = yen(c.total);
+    if (c.per != null) {
+      $("rPerRow").style.display = "";
+      $("rPer").textContent = yen(c.per) + " × " + c.pax + "人";
+    } else {
+      $("rPerRow").style.display = "none";
+    }
     $("rNote").textContent =
-      `単価 ${gas.toFixed(1)}＋10＝${unit.toFixed(1)}円/L ／ 燃費7km/L ／ 10円単位に四捨五入（丸め前 ${yen(totalRaw)}）`;
+      `単価 ${c.gas.toFixed(1)}＋10＝${c.unit.toFixed(1)}円/L ／ 燃費7km/L ／ 精算額は10円単位に四捨五入（丸め前 ${yen(c.totalRaw)}）`;
     box.style.display = "block";
     btn.style.display = "block";
   }
 
   function buildCopyText() {
-    const km = parseFloat($("calcKm").value);
-    const etc = parseFloat($("calcEtc").value) || 0;
-    const gas = parseFloat($("calcGas").value);
-    const rtKm = km * 2;
-    const unit = gas + D.gasSurcharge;
-    const fuel = Math.round((rtKm / D.fuelEfficiency) * unit);
-    const toll = Math.round(etc * 2);
-    const total = Math.round((fuel + toll) / 10) * 10;
-
+    const c = calcValues();
+    if (!c) return "";
     const sel = $("venueSelect");
     const v = allVenues()[Number(sel.value)];
     const venueName = v ? v.name : "（手入力）";
@@ -495,10 +728,11 @@
       "【交通費精算】長岡京SS",
       dateStr ? `日付：${dateStr}` : null,
       `会場：${venueName}`,
-      `往復距離：${rtKm.toFixed(1)}km（片道${km.toFixed(1)}km）`,
-      `高速代（ETC往復）：${yen(toll)}`,
-      `ガソリン代：${yen(fuel)}（${gas.toFixed(1)}+10円/L・燃費7km/L）`,
-      `精算額：${yen(total)}`,
+      `往復距離：${c.rtKm.toFixed(1)}km（片道${c.km.toFixed(1)}km）`,
+      `高速代（ETC往復）：${yen(c.toll)}`,
+      `ガソリン代：${yen(c.fuel)}（${c.gas.toFixed(1)}+10円/L・燃費7km/L）`,
+      `精算額：${yen(c.total)}`,
+      c.per != null ? `乗車人数：${c.pax}人 → 一人あたり：${yen(c.per)}` : null,
     ].filter(Boolean).join("\n");
   }
 
@@ -511,11 +745,74 @@
   });
 
   $("venueSelect").addEventListener("change", onVenueChange);
-  ["calcKm", "calcEtc", "calcGas"].forEach((id) =>
+  ["calcKm", "calcEtc", "calcGas", "calcPax"].forEach((id) =>
     $(id).addEventListener("input", recalc)
   );
 
-  // ---------- venues tab ----------
+  // ---------- venues tab：検索→自動取得 ----------
+  async function searchVenues() {
+    const q = $("venueQuery").value.trim();
+    if (!q) { toast("会場名か住所を入力してください"); return; }
+    const box = $("venueCands");
+    box.innerHTML = '<div class="info"><span class="spinner"></span>検索中…</div>';
+    try {
+      const cands = await geocode(q);
+      if (!cands.length) {
+        box.innerHTML = '<div class="info">見つかりませんでした。市区町村名を足してみてください（例：太陽が丘 宇治市）</div>';
+        return;
+      }
+      box.innerHTML = "";
+      cands.forEach((c) => {
+        const div = document.createElement("div");
+        div.className = "cand-item";
+        div.innerHTML =
+          `<div class="cname">${escapeHtml(c.name)}</div>` +
+          `<div class="caddr">${escapeHtml(c.addr)}</div>`;
+        div.addEventListener("click", () => pickVenueCandidate(c));
+        box.appendChild(div);
+      });
+    } catch (e) {
+      box.innerHTML = '<div class="info">検索でエラーが発生しました。通信環境を確認してもう一度お試しください。</div>';
+    }
+  }
+
+  async function pickVenueCandidate(c) {
+    const mp = D.meetingPoint;
+    const st = $("routeStatus");
+    st.innerHTML = '<span class="spinner"></span>ルートを計算中…';
+    let r = null;
+    const key = apiKey();
+    if (key) {
+      try { r = await routeNavitime(mp, c, key); }
+      catch (e) { /* NAVITIMEが失敗したらOSRMへフォールバック */ }
+    }
+    if (!r) {
+      try { r = await routeOsrm(mp, c); }
+      catch (e) {
+        st.innerHTML = "ルート計算に失敗しました。時間をおいて再試行するか、距離を手入力してください。";
+        return;
+      }
+    }
+    const km = Math.round(r.km * 10) / 10;
+    $("newName").value = c.name;
+    $("newKm").value = km;
+    $("newEtc").value = r.toll;
+    const srcLabel = r.src === "navitime" ? "NAVITIME実額(ETC普通車)" : "料金は概算";
+    $("newMemo").value =
+      `約${r.min}分・` + (r.toll > 0 ? `高速あり・${srcLabel}` : "高速なし");
+    $("tollHint").style.display = r.src === "estimate" && r.toll > 0 ? "block" : "none";
+    $("venueCands").innerHTML = "";
+    st.innerHTML =
+      `✅ <b>${escapeHtml(c.name)}</b>：片道 ${km}km・約${r.min}分` +
+      (r.toll > 0
+        ? `・高速代 ${yen(r.toll)}（片道・${r.src === "navitime" ? "NAVITIME実額" : "概算"}）`
+        : "・高速なし") +
+      " → 下の内容を確認して保存してください";
+  }
+
+  $("venueSearchBtn").addEventListener("click", searchVenues);
+  $("venueQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") searchVenues(); });
+
   function renderVenueList() {
     const box = $("venueList");
     const vs = allVenues();
@@ -539,8 +836,7 @@
         del.textContent = "削除";
         del.addEventListener("click", () => {
           const locals = localVenues();
-          const idx = i - D.venues.length;
-          locals.splice(idx, 1);
+          locals.splice(i - D.venues.length, 1);
           saveLocalVenues(locals);
           refresh();
           toast("削除しました");
@@ -549,12 +845,6 @@
       }
       box.appendChild(div);
     });
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
-    );
   }
 
   $("addVenueBtn").addEventListener("click", () => {
@@ -573,6 +863,8 @@
     $("newKm").value = "";
     $("newEtc").value = "";
     $("newMemo").value = "";
+    $("tollHint").style.display = "none";
+    $("routeStatus").innerHTML = "";
     refresh();
     toast("この端末に保存しました");
   });
@@ -607,7 +899,7 @@
       $("gasWeekInfo").textContent = `共有データの価格：${D.gasPrice.price.toFixed(1)}円/L（${D.gasPrice.week}の週）`;
     } else {
       badge.className = "badge badge-shared";
-      badge.textContent = "共有データ";
+      badge.textContent = "自動更新";
       $("gasWeekInfo").textContent = `${D.gasPrice.week}の週の京都府平均（レギュラー・現金）`;
     }
   }
@@ -623,7 +915,34 @@
   $("gasClearBtn").addEventListener("click", () => {
     localStorage.removeItem(LS_GAS);
     refresh();
-    toast("共有データの価格に戻しました");
+    toast("自動更新の価格に戻しました");
+  });
+
+  function renderApiKey() {
+    const badge = $("apiKeyBadge");
+    if (apiKey()) {
+      badge.className = "badge badge-shared";
+      badge.textContent = "設定済み（NAVITIME使用）";
+      $("routeModeInfo").innerHTML = "<b>NAVITIME（正確な高速料金）</b>";
+    } else {
+      badge.className = "badge badge-local";
+      badge.textContent = "未設定（概算モード）";
+      $("routeModeInfo").innerHTML = "概算モード（設定タブでAPIキーを入れると正確になります）";
+    }
+  }
+
+  $("apiKeySaveBtn").addEventListener("click", () => {
+    const k = $("apiKeyInput").value.trim();
+    if (!k) { toast("APIキーを入力してください"); return; }
+    localStorage.setItem(LS_APIKEY, k);
+    $("apiKeyInput").value = "";
+    refresh();
+    toast("APIキーを保存しました");
+  });
+  $("apiKeyClearBtn").addEventListener("click", () => {
+    localStorage.removeItem(LS_APIKEY);
+    refresh();
+    toast("APIキーを削除しました");
   });
 
   // ---------- init / refresh ----------
@@ -631,14 +950,14 @@
     renderVenueSelect();
     renderVenueList();
     renderGas();
+    renderApiKey();
     $("calcGas").value = effectiveGasPrice();
     recalc();
   }
 
   $("headerSub").textContent =
-    `集合：${D.meetingPoint} ／ 燃費7km/L ／ 週次価格＋10円`;
-  $("meetingPointName").textContent = D.meetingPoint;
-  $("meetingPointName2").textContent = D.meetingPoint;
+    `集合：${D.meetingPoint.name} ／ 燃費7km/L ／ 週次価格＋10円`;
+  $("meetingPointName2").textContent = D.meetingPoint.name;
   $("dataUpdated").textContent = D.dataUpdated;
 
   const today = new Date();
