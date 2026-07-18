@@ -220,38 +220,6 @@
   .spinner::before { content: "⚽"; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* コピー成功時のゴール演出（⚽がゴールマウスに吸い込まれ、ネットが揺れる） */
-  #goalFx { position: fixed; inset: 0; pointer-events: none; z-index: 300; display: none; }
-  #goalFx .goal {
-    position: absolute; right: 6px; top: 34%; font-size: 52px;
-    animation: goalshake 0.3s 0.66s;
-  }
-  #goalFx .ball {
-    position: absolute; left: -40px; top: 58%; font-size: 30px;
-    animation: shoot 0.85s cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
-  }
-  /* ボールの中心がゴール絵文字の中心に一致する位置まで飛び、
-     ネットの奥へ（縮小＋フェード）吸い込まれる。ゴールはボールより後に
-     描画されるためネットが手前に見える */
-  @keyframes shoot {
-    0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
-    80%  { transform: translate(calc(100vw - 7px), calc(-24vh + 10px)) rotate(660deg); opacity: 1; }
-    100% { transform: translate(calc(100vw - 7px), calc(-24vh + 10px)) rotate(720deg) scale(0.35); opacity: 0; }
-  }
-  @keyframes goalshake {
-    0%, 100% { transform: none; }
-    40% { transform: rotate(-7deg) scale(1.08); }
-    70% { transform: rotate(4deg); }
-  }
-  #goalFx .goalText {
-    position: absolute; left: 50%; top: 28%;
-    transform: translateX(-50%) scale(0);
-    font-size: 30px; font-weight: 800; color: var(--green-dark);
-    text-shadow: 0 0 8px #fff, 0 0 16px #fff, 0 2px 6px rgba(0,0,0,0.15);
-    animation: goalpop 0.4s 0.7s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
-  }
-  @keyframes goalpop { to { transform: translateX(-50%) scale(1); } }
-
   .info { font-size: 13px; color: var(--gray); }
   .info a { color: var(--green-dark); }
   .info li { margin-left: 1.3em; margin-bottom: 4px; }
@@ -513,7 +481,6 @@
 
 </main>
 
-<div id="goalFx"></div>
 <div class="toast" id="toast"></div>
 
 <script src="data.js"></script>
@@ -1049,24 +1016,10 @@
     ].filter(Boolean).join("\n");
   }
 
-  // コピー成功時のゴール演出（⚽がゴールに飛び込む）
-  let goalFxTimer = null;
-  function goalAnimation() {
-    const fx = $("goalFx");
-    fx.innerHTML =
-      '<span class="ball">⚽</span><span class="goal">🥅</span><span class="goalText">ゴール！</span>';
-    fx.style.display = "block";
-    clearTimeout(goalFxTimer);
-    goalFxTimer = setTimeout(() => {
-      fx.style.display = "none";
-      fx.innerHTML = "";
-    }, 1700);
-  }
-
   $("copyBtn").addEventListener("click", () => {
     const text = buildCopyText();
     navigator.clipboard.writeText(text).then(
-      () => { goalAnimation(); toast("ゴール！コピーしました。LINEに貼り付けてください"); },
+      () => toast("コピーしました。LINEに貼り付けてください"),
       () => { prompt("コピーできない場合は長押しでコピーしてください", text); }
     );
   });
@@ -1139,7 +1092,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.19";
+  const APP_VERSION = "2.20";
   let lastGasApplied = null;
 
   function refresh() {
