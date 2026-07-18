@@ -493,8 +493,10 @@
     return ov ? ov.price : D.gasPrice.price;
   }
   function apiKey() {
-    return localStorage.getItem(LS_APIKEY) || "";
+    // 空白・不可視文字（ゼロ幅スペース等）が混ざって保存されていても除去して使う
+    return (localStorage.getItem(LS_APIKEY) || "").replace(KEY_CLEAN_RE, "");
   }
+  const KEY_CLEAN_RE = new RegExp("[\\s\\u200B-\\u200D\\uFEFF]", "g");
   function allVenues() {
     return [
       ...D.venues.map((v) => ({ ...v, shared: true })),
@@ -543,11 +545,11 @@
     const uniq = [];
     results.forEach((r) => {
       if (!r.name || isNaN(r.lat)) return;
+      // 500mほど以内は同一地点とみなして重複除去（大型施設の表記ゆれ対策）
       const dup = uniq.some(
         (u) =>
-          u.name === r.name &&
-          Math.abs(u.lat - r.lat) < 0.003 &&
-          Math.abs(u.lon - r.lon) < 0.003
+          Math.abs(u.lat - r.lat) < 0.005 &&
+          Math.abs(u.lon - r.lon) < 0.005
       );
       if (!dup) uniq.push(r);
     });
@@ -896,8 +898,13 @@
   }
 
   $("apiKeySaveBtn").addEventListener("click", () => {
-    const k = $("apiKeyInput").value.trim();
+    const k = $("apiKeyInput").value.replace(KEY_CLEAN_RE, "");
     if (!k) { toast("APIキーを入力してください"); return; }
+    // RapidAPIのキーは半角英数と記号のみ。全角文字が混ざっていたら保存しない
+    if (!/^[\x21-\x7e]+$/.test(k)) {
+      toast("キーに全角文字が混ざっています。コピーし直してください");
+      return;
+    }
     localStorage.setItem(LS_APIKEY, k);
     $("apiKeyInput").value = "";
     refresh();
