@@ -735,6 +735,9 @@
 
   // 連続タップ対策：最後にタップされた会場のリクエストだけを有効にする世代番号
   let routeReqSeq = 0;
+  // 直近のNAVITIME取得結果（LINE文の高速区間表示用）。
+  // 会場名・距離・料金が取得時のまま一致するときだけ使う
+  let lastRoute = null;
 
   async function fetchRouteFor(place) {
     const mp = D.meetingPoint;
@@ -766,6 +769,7 @@
     }
     if (seq !== routeReqSeq) return;  // 古い応答は破棄（会場名と金額の食い違い防止）
     const km = Math.round(r.km * 10) / 10;
+    lastRoute = { name: place.name, km, toll: r.toll, ics: r.ics || [] };
     $("calcKm").value = km;
     $("calcEtc").value = r.toll;
     $("venueCands").innerHTML = "";
@@ -880,12 +884,19 @@
       const wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
       dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${wd}）`;
     }
+    // 高速区間は、NAVITIME取得時の会場・距離・料金から手入力で変更されていないときだけ載せる
+    const icLine =
+      c.etc > 0 && lastRoute && lastRoute.ics.length >= 2 &&
+      venueName === lastRoute.name && c.km === lastRoute.km && c.etc === lastRoute.toll
+        ? `高速区間：${lastRoute.ics.join("→")}`
+        : null;
     return [
       "【交通費精算】長岡京SS",
       dateStr ? `日付：${dateStr}` : null,
       `会場：${venueName}`,
       `往復距離：${c.rtKm.toFixed(1)}km（片道${c.km.toFixed(1)}km）`,
       `高速代（ETC往復）：${yen(c.toll)}`,
+      icLine,
       `ガソリン代：${yen(c.fuel)}（${c.gas.toFixed(1)}+10円/L・燃費7km/L）`,
       `精算額：${yen(c.total)}`,
       c.per != null ? `割り勘人数：${c.pax}人 → 一人あたり：${yen(c.per)}` : null,
@@ -968,7 +979,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.10";
+  const APP_VERSION = "2.11";
   let lastGasApplied = null;
 
   function refresh() {
