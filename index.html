@@ -302,6 +302,7 @@
       </div>
 
       <div id="routeStatus" class="info" style="margin-top:8px;"></div>
+      <div id="quotaMini" class="info" style="margin-top:4px; font-size:12px;"></div>
     </div>
 
     <div class="card">
@@ -387,6 +388,7 @@
         <b>通常は設定不要です</b>（チーム共有キーが内蔵されています）。
         共有キーの無料枠は<b>会場検索・ルート取得それぞれ月500回</b>をチーム全員で共用します。使い切ると翌月まで自動取得が止まりますが、距離・料金の手入力で計算は可能です。
       </div>
+      <div class="info" id="apiQuotaInfo" style="margin-top:8px;"></div>
       <div class="info" style="margin-top:8px;">
         自分専用のキーを使いたい場合（枠を分けたい人向け）：RapidAPIで無料アカウント作成 →
         <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-car" target="_blank" rel="noopener">NAVITIME Route(car)</a> と
@@ -535,6 +537,62 @@
     renderHistory();
   }
 
+  // ---------- API残り回数の記録・表示 ----------
+  // RapidAPIはレスポンスヘッダーで「今月の残り回数」を返すので、
+  // 取得のたびに読み取って保存し、画面に表示する（この端末で最後に使った時点の値）
+  const LS_QUOTA = "nss_apiQuota";
+  function quotaData() {
+    try { return JSON.parse(lsGet(LS_QUOTA)) || {}; } catch { return {}; }
+  }
+  function recordQuota(kind, resp) {
+    try {
+      const rem = parseInt(resp.headers.get("x-ratelimit-requests-remaining"), 10);
+      const lim = parseInt(resp.headers.get("x-ratelimit-requests-limit"), 10);
+      const reset = parseInt(resp.headers.get("x-ratelimit-requests-reset"), 10);
+      if (isNaN(rem) || isNaN(lim)) return;
+      const q = quotaData();
+      q[kind] = {
+        remaining: rem,
+        limit: lim,
+        resetDays: isNaN(reset) ? null : Math.ceil(reset / 86400),
+        at: Date.now(),
+        personal: !!personalKey(),
+      };
+      lsSet(LS_QUOTA, JSON.stringify(q));
+      renderQuota();
+    } catch {}
+  }
+  function quotaLine(label, e) {
+    if (!e) return label + "：未取得";
+    const warn = e.remaining <= 50;
+    return (
+      `${label}：<b${warn ? ' style="color:#b91c1c;"' : ""}>残り${e.remaining}回</b>／${e.limit}回` +
+      (e.resetDays != null ? `（あと${e.resetDays}日でリセット）` : "")
+    );
+  }
+  function renderQuota() {
+    const q = quotaData();
+    const box = $("apiQuotaInfo");
+    if (!q.route && !q.spot) {
+      box.innerHTML = "今月の残り回数：まだ不明（一度取得すると表示されます）";
+    } else {
+      const keyLabel = (q.route || q.spot).personal ? "個人キー" : "共有キー";
+      box.innerHTML =
+        `<b>今月の残り回数（${keyLabel}・この端末で最後に使った時点）</b><br>` +
+        quotaLine("ルート取得", q.route) + "<br>" +
+        quotaLine("会場検索", q.spot);
+    }
+    const mini = $("quotaMini");
+    if (q.route) {
+      const warn = q.route.remaining <= 50;
+      mini.innerHTML = warn
+        ? `<span style="color:#b91c1c;">⚠ 今月のルート取得 残り${q.route.remaining}回</span>`
+        : `今月のルート取得 残り${q.route.remaining}回`;
+    } else {
+      mini.innerHTML = "";
+    }
+  }
+
   // ---------- 会場検索（NAVITIMEスポット検索 + GSI + OpenStreetMap Nominatim） ----------
   // NAVITIMEスポット検索（RapidAPI・無料500回/月・ルート検索とは別枠）。
   // 施設名の検索精度が最も高いため主軸に使い、未契約・枠切れ・通信不良のときは
@@ -551,6 +609,7 @@
         },
       }
     );
+    recordQuota("spot", r);
     if (!r.ok) throw new Error("navitime spot http " + r.status);
     const j = await r.json();
     return (j.items || []).map((x) => ({
@@ -652,6 +711,7 @@
     if ((r.status === 400 || r.status === 422) && st)
       r = await fetchTimeout(base + "&condition=toll_time", { headers });
     if (r.status === 400 || r.status === 422) r = await fetchTimeout(base, { headers });
+    recordQuota("route", r);
     if (!r.ok) {
       const reasons = {
         401: "APIキーが正しくありません。設定タブでキーを確認してください",
@@ -1010,13 +1070,14 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.15";
+  const APP_VERSION = "2.16";
   let lastGasApplied = null;
 
   function refresh() {
     renderGas();
     renderApiKey();
     renderHistory();
+    renderQuota();
     // 計算画面のガソリン価格は、ユーザーが手で変えていない場合のみ反映
     const g = effectiveGasPrice();
     const cur = parseFloat($("calcGas").value);
