@@ -23,6 +23,8 @@
 
 2回目以降は「最近の会場」チップをタップするだけ（毎回最新ルートを取り直します）。
 
+**推奨ブラウザ：Safari / Chrome。** LINEアプリ内のブラウザは表示が乱れることがあるため（実機で確認済み）、外部ブラウザで開くのを推奨。アプリ内で開いた場合は画面に警告バナーが出ます。よく使う人は「ホーム画面に追加」が便利です。
+
 ## 精算ルール
 
 ```
@@ -78,6 +80,9 @@
 
 ## 管理者向けメモ
 
+- **LINEでURLを共有するとき**は末尾に `?openExternalBrowser=1` を付ける
+  （`https://kosuking-netizen.github.io/nagaokakyo-ss-carpool/?openExternalBrowser=1`）。
+  LINEの仕様でアプリ内ブラウザを経由せず自動で外部ブラウザが開き、表示乱れを回避できる
 - **共有データの変更**：GitHubで `data.js`（集合場所）や `key.js`（共有キー）を直接編集 → Commit → 数分で全員に反映
 - **ガソリン価格の自動更新が失敗した場合**：GitHubからメールが届く。`scripts/update_gas_price.py` の取得元ページ構造変更が主因になりうる。手動更新は `data.js` の `[AUTO-GAS-PRICE]` 行を直接編集
 - **注意**：GitHub Actionsのボットによるpushでは Pages が自動再ビルドされないため、ワークフロー内で `gh api` により明示的にビルド要求している（update-gas-price.yml参照）

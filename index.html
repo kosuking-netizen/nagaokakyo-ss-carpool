@@ -275,6 +275,10 @@
 
   <!-- ============ 精算計算 ============ -->
   <section id="tab-calc" class="active">
+    <div class="warn" id="inAppBrowserWarn" style="display:none; margin:0 0 14px;">
+      LINEアプリ内のブラウザで開いています。表示が乱れることがあるため、
+      <b>SafariやChromeで開くことをおすすめします</b>（画面右下の「⋯」メニュー →「他のアプリで開く」or「ブラウザで開く」）。
+    </div>
     <div class="card">
       <h2>① 会場を入れる</h2>
       <div class="info">
@@ -446,6 +450,7 @@
       データ更新日：<span id="dataUpdated"></span> ／ アプリ版：<span id="appVersion"></span><br>
       会場検索・ルート・高速料金：NAVITIME ／ 住所検索：国土地理院 ／ © OpenStreetMap contributors<br>
       本アプリは非商用の補助ツールです。金額をご確認のうえご利用ください<br>
+      推奨ブラウザ：Safari / Chrome（LINEアプリ内のブラウザでは表示が乱れることがあります）<br>
       表示が古いときは、数分待ってからページを再読み込みしてください
     </footer>
   </section>
@@ -999,7 +1004,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.13";
+  const APP_VERSION = "2.14";
   let lastGasApplied = null;
 
   function refresh() {
@@ -1016,6 +1021,11 @@
 
   // 旧バージョン（会場マスタ方式）が残したデータを掃除
   lsDel("nss_localVenues");
+
+  // LINEアプリ内ブラウザは描画が乱れることがあるため、外部ブラウザを促す
+  if (/\bLine\//i.test(navigator.userAgent)) {
+    $("inAppBrowserWarn").style.display = "block";
+  }
 
   $("appVersion").textContent = APP_VERSION;
   $("headerSub").textContent =
