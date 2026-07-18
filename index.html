@@ -781,10 +781,14 @@
     const st = $("routeStatus");
     st.innerHTML = '<span class="spinner"></span>ルートを計算中…';
     let r = null;
+    let navErr = null;
     const key = apiKey();
     if (key) {
       try { r = await routeNavitime(mp, c, key); }
-      catch (e) { /* NAVITIMEが失敗したらOSRMへフォールバック */ }
+      catch (e) {
+        navErr = (e && e.message) ? e.message : String(e);
+        console.warn("NAVITIME取得失敗:", navErr);
+      }
     }
     if (!r) {
       try { r = await routeOsrm(mp, c); }
@@ -807,7 +811,10 @@
       (r.toll > 0
         ? `・高速代 ${yen(r.toll)}（片道・${r.src === "navitime" ? "NAVITIME実額" : "概算"}）`
         : "・高速なし") +
-      " → 下の内容を確認して保存してください";
+      " → 下の内容を確認して保存してください" +
+      (navErr && r.src === "estimate"
+        ? `<br>⚠ NAVITIMEの取得に失敗したため概算で表示しています（${escapeHtml(navErr)}）`
+        : "");
   }
 
   $("venueSearchBtn").addEventListener("click", searchVenues);
