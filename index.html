@@ -440,7 +440,7 @@
         <li>燃費は <b>7km/L</b> で統一</li>
         <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」（毎週水曜夜に自動更新）</li>
         <li>高速料金はNAVITIMEの実額（ETC・普通車・往復）</li>
-        <li>精算額は10円単位に四捨五入、一人あたりは10円単位に切り上げ</li>
+        <li>丸め方：ガソリン代を1円単位に四捨五入 → 高速代と合計して10円単位に四捨五入 ／ 一人あたりは10円単位に切り上げ</li>
       </ul>
       <div class="info" style="margin-top:8px;">
         計算式：<b>精算額 ＝ 往復距離 ÷ 7 ×（週次価格＋10円）＋ ETC片道×2</b><br>
@@ -501,11 +501,13 @@
   const $ = (id) => document.getElementById(id);
   const yen = (n) => n.toLocaleString("ja-JP") + "円";
 
+  let toastTimer = null;
   function toast(msg) {
     const t = $("toast");
     t.textContent = msg;
     t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 2500);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
   }
 
   function escapeHtml(s) {
@@ -679,9 +681,10 @@
     const sel = $("venueSelect");
     const cur = sel.value;
     sel.innerHTML = '<option value="">－ 会場を選択 －</option>';
-    allVenues().forEach((v, i) => {
+    // 値は会場名で管理する（番号管理だと会場の追加・削除で選択がズレるため）
+    allVenues().forEach((v) => {
       const opt = document.createElement("option");
-      opt.value = String(i);
+      opt.value = "v:" + v.name;
       opt.textContent = v.name + (v.shared ? "" : "（この端末のみ）");
       sel.appendChild(opt);
     });
@@ -695,8 +698,9 @@
   // プルダウンで実在の会場が選ばれているときだけ返す（未選択""や"manual"はnull）
   function selectedVenue() {
     const val = $("venueSelect").value;
-    if (val === "" || val === "manual") return null;
-    return allVenues()[Number(val)] || null;
+    if (!val.startsWith("v:")) return null;
+    const name = val.slice(2);
+    return allVenues().find((v) => v.name === name) || null;
   }
 
   function onVenueChange() {
@@ -761,7 +765,7 @@
       $("rPerRow").style.display = "none";
     }
     $("rNote").textContent =
-      `単価 ${c.gas.toFixed(1)}＋10＝${c.unit.toFixed(1)}円/L ／ 燃費7km/L ／ 精算額は10円単位に四捨五入（丸め前 ${yen(c.totalRaw)}）`;
+      `単価 ${c.gas.toFixed(1)}＋10＝${c.unit.toFixed(1)}円/L ／ 燃費7km/L ／ ガソリン代＋高速代＝${yen(c.totalRaw)} を10円単位に四捨五入`;
     const warns = calcWarnings(c);
     const wBox = $("rWarn");
     if (warns.length) {
@@ -919,6 +923,14 @@
       toast("会場名と片道距離を入力してください");
       return;
     }
+    if (etc < 0) {
+      toast("ETC料金は0以上で入力してください");
+      return;
+    }
+    if (allVenues().some((v) => v.name === name)) {
+      toast("同じ名前の会場がすでに登録されています");
+      return;
+    }
     const locals = localVenues();
     locals.push({ name, km, etc, memo });
     saveLocalVenues(locals);
@@ -1014,7 +1026,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "1.2";
+  const APP_VERSION = "1.3";
   let lastGasApplied = null;
 
   function refresh() {
@@ -1029,6 +1041,14 @@
     lastGasApplied = g;
     recalc();
   }
+
+  // 共有マスタに取り込み済みのローカル会場を自動整理（二重表示を防ぐ）
+  (function pruneLocalVenues() {
+    const sharedNames = new Set(D.venues.map((v) => v.name));
+    const locals = localVenues();
+    const kept = locals.filter((v) => !sharedNames.has(v.name));
+    if (kept.length !== locals.length) saveLocalVenues(kept);
+  })();
 
   $("appVersion").textContent = APP_VERSION;
   $("headerSub").textContent =

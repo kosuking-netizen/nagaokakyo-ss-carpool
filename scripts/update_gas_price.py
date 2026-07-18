@@ -36,9 +36,16 @@ def fetch_price():
     if not matches:
         raise RuntimeError("価格パターンが見つかりません（ページ構造が変わった可能性）")
 
-    best = max(matches, key=lambda m: (int(m[1]), int(m[2]), int(m[3])))
-    price = float(best[0])
-    week = "%04d-%02d-%02d" % (int(best[1]), int(best[2]), int(best[3]))
+    best_date = max((int(m[1]), int(m[2]), int(m[3])) for m in matches)
+    prices = {m[0] for m in matches if (int(m[1]), int(m[2]), int(m[3])) == best_date}
+    if len(prices) > 1:
+        # 最新日付に複数の異なる価格が並ぶ場合はどれが平均価格か判別できないため安全側で停止
+        raise RuntimeError(
+            "同じ日付(%s)に複数の異なる価格 %s が見つかりました。ページ構造の確認が必要"
+            % ("%04d-%02d-%02d" % best_date, sorted(prices))
+        )
+    price = float(prices.pop())
+    week = "%04d-%02d-%02d" % best_date
 
     if not (80.0 <= price <= 400.0):
         raise RuntimeError("取得した価格が異常値です: %s" % price)
@@ -79,16 +86,18 @@ def update_data_js(price, week):
         'week: "%s", // [AUTO-GAS-WEEK]' % week,
         new,
     )
+
+    # 価格・週に実際の変更があるときだけ更新日を書き換えてコミットさせる
+    if new == src:
+        print("変更なし（価格 %s 円/L・%s の週のまま）" % (price, week))
+        return False
+
     jst_today = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d")
     new = re.sub(
         r'dataUpdated: "[\d-]+", // \[AUTO-UPDATED\]',
         'dataUpdated: "%s", // [AUTO-UPDATED]' % jst_today,
         new,
     )
-
-    if new == src:
-        print("変更なし（価格 %s 円/L・%s の週のまま）" % (price, week))
-        return False
     with open(DATA_JS, "w", encoding="utf-8", newline="\n") as f:
         f.write(new)
     print("更新しました: %s 円/L（%s の週）" % (price, week))
