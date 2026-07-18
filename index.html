@@ -545,8 +545,9 @@
   // 従来のNominatim+GSIだけで検索を続行する（このアプリはエラーにしない）
   async function spotNavitime(q, key) {
     const r = await fetchTimeout(
+      // lang等のオプションは無料契約外で400になるため付けない
       "https://navitime-spot.p.rapidapi.com/spot?word=" +
-        encodeURIComponent(q) + "&limit=10&lang=ja",
+        encodeURIComponent(q) + "&limit=10",
       {
         headers: {
           "X-RapidAPI-Key": key,
