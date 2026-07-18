@@ -54,8 +54,9 @@
 ## 外部サービス（すべて無料）
 
 - **NAVITIME Route(car)**（RapidAPI経由）：ルート・高速料金。月500回ハードリミット・カード未登録のため課金は発生し得ない。ETC普通車料金は `fare.unit_1025` 系を優先、なければ `unit_1024`（現金）
+- **NAVITIME Spot**（RapidAPI経由）：施設名検索の主軸。Route(car)と同じキーで使えるが**別APIなのでRapidAPIでの無料プランSubscribeも別途必要**（月500回・Route(car)とは別枠のハードリミット）。未契約・枠切れでも検索は下の2つで動き続ける
 - **国土地理院**：住所検索・地図タイル
-- **OpenStreetMap Nominatim**：施設名検索
+- **OpenStreetMap Nominatim**：施設名検索（フォールバック）
 - **GitHub Pages / Actions**：公開・自動化
 
 ## APIキーの仕組み

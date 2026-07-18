@@ -539,44 +539,72 @@
     renderHistory();
   }
 
-  // ---------- free geocoding (GSI + OpenStreetMap Nominatim) ----------
+  // ---------- 会場検索（NAVITIMEスポット検索 + GSI + OpenStreetMap Nominatim） ----------
+  // NAVITIMEスポット検索（RapidAPI・無料500回/月・ルート検索とは別枠）。
+  // 施設名の検索精度が最も高いため主軸に使い、未契約・枠切れ・通信不良のときは
+  // 従来のNominatim+GSIだけで検索を続行する（このアプリはエラーにしない）
+  async function spotNavitime(q, key) {
+    const r = await fetchTimeout(
+      "https://navitime-spot.p.rapidapi.com/spot?word=" +
+        encodeURIComponent(q) + "&limit=10&lang=ja",
+      {
+        headers: {
+          "X-RapidAPI-Key": key,
+          "X-RapidAPI-Host": "navitime-spot.p.rapidapi.com",
+        },
+      }
+    );
+    if (!r.ok) throw new Error("navitime spot http " + r.status);
+    const j = await r.json();
+    return (j.items || []).map((x) => ({
+      // nameはlang指定時に多言語オブジェクトになる場合があるため両対応
+      name: typeof x.name === "string" ? x.name : (x.name && x.name.ja) || "",
+      addr: x.address_name || "",
+      lat: x.coord && x.coord.lat,
+      lon: x.coord && x.coord.lon,
+    }));
+  }
+
   async function geocode(q) {
-    const results = [];
-    const tasks = [
+    const key = apiKey();
+    const [navi, osm, gsi] = await Promise.all([
+      key
+        ? spotNavitime(q, key).catch((e) => {
+            console.warn("NAVITIMEスポット検索が使えないため他の検索に切替:", e && e.message);
+            return [];
+          })
+        : Promise.resolve([]),
       fetch(
         "https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=jp&limit=5&accept-language=ja&q=" +
           encodeURIComponent(q)
       )
         .then((r) => (r.ok ? r.json() : []))
         .then((list) =>
-          list.forEach((x) =>
-            results.push({
-              name: x.name || (x.display_name || "").split(",")[0],
-              addr: x.display_name || "",
-              lat: parseFloat(x.lat),
-              lon: parseFloat(x.lon),
-            })
-          )
+          list.map((x) => ({
+            name: x.name || (x.display_name || "").split(",")[0],
+            addr: x.display_name || "",
+            lat: parseFloat(x.lat),
+            lon: parseFloat(x.lon),
+          }))
         )
-        .catch(() => {}),
+        .catch(() => []),
       fetch(
         "https://msearch.gsi.go.jp/address-search/AddressSearch?q=" +
           encodeURIComponent(q)
       )
         .then((r) => (r.ok ? r.json() : []))
         .then((list) =>
-          (list || []).slice(0, 5).forEach((x) =>
-            results.push({
-              name: x.properties && x.properties.title,
-              addr: (x.properties && x.properties.title) || "",
-              lat: x.geometry.coordinates[1],
-              lon: x.geometry.coordinates[0],
-            })
-          )
+          (list || []).slice(0, 5).map((x) => ({
+            name: x.properties && x.properties.title,
+            addr: (x.properties && x.properties.title) || "",
+            lat: x.geometry.coordinates[1],
+            lon: x.geometry.coordinates[0],
+          }))
         )
-        .catch(() => {}),
-    ];
-    await Promise.all(tasks);
+        .catch(() => []),
+    ]);
+    // NAVITIMEを先頭に並べ、近接重複除去でNAVITIMEの正式名称が残るようにする
+    const results = [...navi, ...osm, ...gsi];
     const uniq = [];
     results.forEach((r) => {
       if (!r.name || isNaN(r.lat)) return;
