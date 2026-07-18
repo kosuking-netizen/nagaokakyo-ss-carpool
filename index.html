@@ -340,6 +340,7 @@
           <tr class="per" id="rPerRow" style="display:none;"><td>一人あたり<span style="font-size:11px;color:var(--gray);">（10円切上げ）</span></td><td id="rPer"></td></tr>
         </table>
         <div class="note" id="rNote"></div>
+        <div class="note">※金額は概算の参考値です。妥当性を確認のうえご利用ください（詳細：設定タブの免責事項）</div>
         <div class="warn" id="rWarn" style="display:none;"></div>
       </div>
 
@@ -380,12 +381,15 @@
       <div class="info">
         状態：<span class="badge" id="apiKeyBadge"></span><br>
         <b>通常は設定不要です</b>（チーム共有キーが内蔵されています）。
-        共有キーは月500回までチーム全員で共用します。使い切ると翌月まで自動取得が止まりますが、距離・料金の手入力で計算は可能です。
+        共有キーの無料枠は<b>会場検索・ルート取得それぞれ月500回</b>をチーム全員で共用します。使い切ると翌月まで自動取得が止まりますが、距離・料金の手入力で計算は可能です。
       </div>
       <div class="info" style="margin-top:8px;">
-        自分専用のキーを使いたい場合（枠を分けたい人向け）：<a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-car" target="_blank" rel="noopener">RapidAPIのNAVITIME Route(car)</a>
-        で無料アカウント作成 → Pricing → Basic($0.00) を Subscribe（クレジットカード不要・自動課金なし）→ キーを下に貼り付け。
+        自分専用のキーを使いたい場合（枠を分けたい人向け）：RapidAPIで無料アカウント作成 →
+        <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-car" target="_blank" rel="noopener">NAVITIME Route(car)</a> と
+        <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-spot" target="_blank" rel="noopener">NAVITIME Spot</a> の両方で
+        Pricing → Basic($0.00) を Subscribe（クレジットカード不要・自動課金なし）→ キーを下に貼り付け。
         個人キーは<b>この端末の中だけ</b>に保存され、共有キーより優先されます。
+        （Spotを契約しなくても会場検索は別の無料検索で動きます）
       </div>
       <label class="field">個人APIキー（X-RapidAPI-Key・任意）</label>
       <div class="row">
@@ -436,9 +440,21 @@
       </ol>
     </div>
 
+    <div class="card">
+      <h2>免責事項</h2>
+      <ul class="info">
+        <li>本アプリは商用サービスではなく、チームの保護者が善意で運営する<b>精算の補助ツール</b>です</li>
+        <li>表示される距離・高速料金・ガソリン価格・精算額は<b>概算の参考値</b>です。実際の走行ルート・料金・価格と異なる場合があります</li>
+        <li>精算額は<b>必ずご自身で妥当性を確認したうえで</b>ご利用ください（結果画面の「地図で距離を照合」リンクやLINEコピー文の計算根拠が確認に使えます）</li>
+        <li>本アプリの利用により生じた損害・精算の食い違い等について、運営者は責任を負いません</li>
+        <li>外部サービス（NAVITIME・国土地理院・OpenStreetMap等）の仕様変更・無料枠の制限により、予告なく一部機能が使えなくなることがあります</li>
+      </ul>
+    </div>
+
     <footer>
       データ更新日：<span id="dataUpdated"></span> ／ アプリ版：<span id="appVersion"></span><br>
-      ルート・高速料金：NAVITIME ／ 地名検索：国土地理院・© OpenStreetMap contributors<br>
+      会場検索・ルート・高速料金：NAVITIME ／ 住所検索・地図：国土地理院 ／ © OpenStreetMap contributors<br>
+      本アプリは非商用の補助ツールです。金額は概算の参考値のため、妥当性をご確認のうえご利用ください<br>
       表示が古いときは、数分待ってからページを再読み込みしてください
     </footer>
   </section>
@@ -575,7 +591,7 @@
             return [];
           })
         : Promise.resolve([]),
-      fetch(
+      fetchTimeout(
         "https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=jp&limit=5&accept-language=ja&q=" +
           encodeURIComponent(q)
       )
@@ -589,7 +605,7 @@
           }))
         )
         .catch(() => []),
-      fetch(
+      fetchTimeout(
         "https://msearch.gsi.go.jp/address-search/AddressSearch?q=" +
           encodeURIComponent(q)
       )
@@ -1008,7 +1024,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.3";
+  const APP_VERSION = "2.5";
   let lastGasApplied = null;
 
   function refresh() {
