@@ -372,19 +372,18 @@
     </div>
 
     <div class="card">
-      <h2>NAVITIME APIキー（計算する人ごとに設定）</h2>
+      <h2>NAVITIME APIキー</h2>
       <div class="info">
         状態：<span class="badge" id="apiKeyBadge"></span><br>
-        ルート・高速料金の自動取得に必要です。<b>計算する人（運転する保護者）の端末ごと</b>に一度だけ設定してください。
-        キーはチームの管理者から受け取るか、下記リンクから無料取得できます。
-        未設定でも距離・料金を手入力すれば計算できます。
+        <b>通常は設定不要です</b>（チーム共有キーが内蔵されています）。
+        共有キーは月500回までチーム全員で共用します。使い切ると翌月まで自動取得が止まりますが、距離・料金の手入力で計算は可能です。
       </div>
       <div class="info" style="margin-top:8px;">
-        自分で取得する場合：<a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-car" target="_blank" rel="noopener">RapidAPIのNAVITIME Route(car)</a>
-        で無料アカウント作成 → Pricing → Basic($0.00) を Subscribe（月500回まで・超過は停止するだけで自動課金なし・クレジットカード不要）。
-        キーは<b>この端末の中だけ</b>に保存され、他の人には見えません。
+        自分専用のキーを使いたい場合（枠を分けたい人向け）：<a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-car" target="_blank" rel="noopener">RapidAPIのNAVITIME Route(car)</a>
+        で無料アカウント作成 → Pricing → Basic($0.00) を Subscribe（クレジットカード不要・自動課金なし）→ キーを下に貼り付け。
+        個人キーは<b>この端末の中だけ</b>に保存され、共有キーより優先されます。
       </div>
-      <label class="field">APIキー（X-RapidAPI-Key）</label>
+      <label class="field">個人APIキー（X-RapidAPI-Key・任意）</label>
       <div class="row">
         <div><input type="password" id="apiKeyInput" placeholder="APIキーを貼り付け"></div>
         <div style="flex:0 0 auto;">
@@ -425,9 +424,10 @@
     <div class="card">
       <h2>管理者向け：共有データの更新方法</h2>
       <ol class="info">
-        <li>GitHubで <a href="https://github.com/kosuking-netizen/nagaokakyo-ss-carpool/blob/master/data.js" target="_blank" rel="noopener"><b>data.js</b></a> を開く</li>
+        <li>GitHubで <a href="https://github.com/kosuking-netizen/nagaokakyo-ss-carpool/blob/master/data.js" target="_blank" rel="noopener"><b>data.js</b></a>（集合場所など）または
+          <a href="https://github.com/kosuking-netizen/nagaokakyo-ss-carpool/blob/master/key.js" target="_blank" rel="noopener"><b>key.js</b></a>（チーム共有APIキー）を開く</li>
         <li>鉛筆マーク（Edit）を押す</li>
-        <li>集合場所などを書き換える（ガソリン価格は自動更新なので触らなくてOK）</li>
+        <li>書き換える（ガソリン価格は自動更新なので触らなくてOK）</li>
         <li>「Commit changes」を押す → 数分で全員のアプリに反映</li>
       </ol>
     </div>
@@ -444,6 +444,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="data.js"></script>
+<script src="key.js"></script>
 <script src="calc.js"></script>
 <script>
 (function () {
@@ -494,9 +495,16 @@
     return ov ? ov.price : D.gasPrice.price;
   }
   const KEY_CLEAN_RE = new RegExp("[\\s\\u200B-\\u200D\\uFEFF]", "g");
-  function apiKey() {
+  function personalKey() {
     // 空白・不可視文字（ゼロ幅スペース等）が混ざって保存されていても除去して使う
     return (lsGet(LS_APIKEY) || "").replace(KEY_CLEAN_RE, "");
+  }
+  function sharedKey() {
+    return (window.APP_SHARED_KEY || "").replace(KEY_CLEAN_RE, "");
+  }
+  // 個人キーがあれば優先、なければチーム共有キー（key.js）を使う
+  function apiKey() {
+    return personalKey() || sharedKey();
   }
 
   // 最近使った会場（名前と座標のみ保存。ルート・料金は毎回取り直す）
@@ -686,7 +694,7 @@
     const key = apiKey();
     if (!key) {
       st.innerHTML =
-        "⚠ NAVITIME APIキーが未設定のため自動取得できません。「価格・設定」タブでキーを設定するか、距離とETC料金を手入力してください。";
+        "⚠ APIキーが未設定のため自動取得できません（チーム共有キーの設定を管理者に確認してください）。距離とETC料金の手入力でも計算できます。";
       return;
     }
     st.innerHTML = '<span class="spinner"></span>NAVITIMEで最新ルートを取得中…';
@@ -870,9 +878,12 @@
 
   function renderApiKey() {
     const badge = $("apiKeyBadge");
-    if (apiKey()) {
+    if (personalKey()) {
+      badge.className = "badge badge-local";
+      badge.textContent = "この端末の個人キーを使用中";
+    } else if (sharedKey()) {
       badge.className = "badge badge-shared";
-      badge.textContent = "設定済み";
+      badge.textContent = "チーム共有キーを使用中（設定不要）";
     } else {
       badge.className = "badge badge-local";
       badge.textContent = "未設定";
@@ -890,16 +901,16 @@
     lsSet(LS_APIKEY, k);
     $("apiKeyInput").value = "";
     refresh();
-    toast("APIキーを保存しました");
+    toast("個人キーを保存しました（共有キーより優先されます）");
   });
   $("apiKeyClearBtn").addEventListener("click", () => {
     lsDel(LS_APIKEY);
     refresh();
-    toast("APIキーを削除しました");
+    toast("個人キーを削除しました");
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.1";
+  const APP_VERSION = "2.2";
   let lastGasApplied = null;
 
   function refresh() {

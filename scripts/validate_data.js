@@ -44,9 +44,25 @@ if (D) {
     "meetingPoint の座標が京都周辺ではありません: " + mp.lat + "," + mp.lon);
 }
 
+// key.js（チーム共有APIキー）の検証：貼り付けミス（全角文字・引用符崩れ）を検出
+try {
+  const keySrc = fs.readFileSync(__dirname + "/../key.js", "utf8");
+  const keySandbox = { window: {} };
+  vm.createContext(keySandbox);
+  vm.runInContext(keySrc, keySandbox);
+  const k = keySandbox.window.APP_SHARED_KEY;
+  ok(typeof k === "string", "key.js: APP_SHARED_KEY が文字列ではありません");
+  if (typeof k === "string" && k.length > 0) {
+    ok(/^[\x21-\x7e]+$/.test(k),
+      "key.js: キーに全角文字か空白が混ざっています。RapidAPIからコピーし直してください");
+  }
+} catch (e) {
+  errors.push("key.js に構文エラーがあります: " + e.message);
+}
+
 if (errors.length) {
-  console.error("❌ data.js の検証に失敗しました:");
+  console.error("❌ 共有データの検証に失敗しました:");
   errors.forEach((e) => console.error("  - " + e));
   process.exit(1);
 }
-console.log(`✅ data.js OK（ガソリン ${D.gasPrice.price}円/L・${D.gasPrice.week}の週）`);
+console.log(`✅ data.js / key.js OK（ガソリン ${D.gasPrice.price}円/L・${D.gasPrice.week}の週）`);
