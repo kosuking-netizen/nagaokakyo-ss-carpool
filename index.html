@@ -670,10 +670,16 @@
         console.warn("NAVITIME: 想定外の料金フィールドのため最小値を採用", fare);
       }
     }
+    // 料金明細(fares)から通過IC・JCT名を抽出（例：長岡京→門真JCT→松原JCT→出島）。
+    // 高速を使わないルートではfaresが無いため空配列になる
+    const ics = (item.fares || [])
+      .filter((s) => s && s.type === "point" && s.name)
+      .map((s) => s.name);
     return {
       km: move.distance / 1000,
       min: move.time,
       toll: Math.round(toll || 0),
+      ics,
     };
   }
 
@@ -764,10 +770,14 @@
     $("calcEtc").value = r.toll;
     $("venueCands").innerHTML = "";
     pushHistory(place);
+    const icChain =
+      r.toll > 0 && r.ics && r.ics.length >= 2
+        ? `<br>高速区間：${r.ics.map(escapeHtml).join(" → ")}`
+        : "";
     st.innerHTML =
       `✅ <b>${escapeHtml(place.name)}</b>：片道 ${km}km・約${r.min}分` +
       (r.toll > 0 ? `・高速代 ${yen(r.toll)}（片道・NAVITIME実額）` : "・高速なし") +
-      "（いま時点の最新ルート） ／ " +
+      "（いま時点の最新ルート）" + icChain + " ／ " +
       `<a href="https://www.google.com/maps/dir/?api=1&origin=${mp.lat},${mp.lon}&destination=${place.lat},${place.lon}&travelmode=driving" target="_blank" rel="noopener">地図で距離を照合</a>`;
     recalc();
   }
@@ -958,7 +968,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.9";
+  const APP_VERSION = "2.10";
   let lastGasApplied = null;
 
   function refresh() {
