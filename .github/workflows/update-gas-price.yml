@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  pages: write
 
 jobs:
   update:
@@ -18,7 +19,9 @@ jobs:
       - name: 価格を取得して data.js を更新
         run: python3 scripts/update_gas_price.py
 
-      - name: 変更があればコミット
+      - name: 変更があればコミットしてPages再ビルド
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "gas-price-bot"
           git config user.email "actions@users.noreply.github.com"
@@ -26,6 +29,8 @@ jobs:
             git add data.js
             git commit -m "ガソリン価格を自動更新"
             git push
+            # GITHUB_TOKENによるpushではPagesの自動ビルドが走らないため明示的に要求する
+            gh api -X POST "repos/${{ github.repository }}/pages/builds"
           else
             echo "変更なし"
           fi

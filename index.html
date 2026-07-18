@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>長岡京SS 配車交通費精算</title>
+<meta property="og:title" content="長岡京SS 配車交通費精算">
+<meta property="og:description" content="会場を選ぶだけで配車の交通費精算額を自動計算。ガソリン価格は毎週自動更新。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <style>
   :root {
     --green: #1a7a4a;
@@ -300,7 +303,7 @@
       <div class="result" id="resultBox" style="display:none;">
         <table>
           <tr><td>往復距離</td><td id="rKm"></td></tr>
-          <tr><td>ガソリン代 <span style="font-size:11px;color:var(--gray);">(往復÷7km/L×単価+10円)</span></td><td id="rFuel"></td></tr>
+          <tr><td>ガソリン代 <span style="font-size:11px;color:var(--gray);">＝往復距離÷7km/L×(単価+10円)</span></td><td id="rFuel"></td></tr>
           <tr><td>高速代（ETC往復）</td><td id="rToll"></td></tr>
           <tr class="total"><td>精算額</td><td id="rTotal"></td></tr>
           <tr class="per" id="rPerRow" style="display:none;"><td>一人あたり<span style="font-size:11px;color:var(--gray);">（10円切上げ）</span></td><td id="rPer"></td></tr>
@@ -438,14 +441,18 @@
     <div class="card">
       <h2>管理者向け：共有データの更新方法</h2>
       <ol class="info">
-        <li>GitHubでこのリポジトリの <b>data.js</b> を開く</li>
+        <li>GitHubで <a href="https://github.com/kosuking-netizen/nagaokakyo-ss-carpool/blob/master/data.js" target="_blank" rel="noopener"><b>data.js</b></a> を開く</li>
         <li>鉛筆マーク（Edit）を押す</li>
         <li>会場（venues）などを書き換える（ガソリン価格は自動更新なので触らなくてOK）</li>
         <li>「Commit changes」を押す → 数分で全員のアプリに反映</li>
       </ol>
     </div>
 
-    <footer>データ更新日：<span id="dataUpdated"></span></footer>
+    <footer>
+      データ更新日：<span id="dataUpdated"></span> ／ アプリ版：<span id="appVersion"></span><br>
+      ルート・高速料金：NAVITIME ／ 地名検索：国土地理院・© OpenStreetMap contributors<br>
+      表示が古いときは、数分待ってからページを再読み込みしてください
+    </footer>
   </section>
 
 </main>
@@ -563,6 +570,18 @@
     return uniq.slice(0, 8);
   }
 
+  // 15秒でタイムアウトするfetch（通信不良でスピナーが回り続けるのを防ぐ）
+  function fetchTimeout(url, opts) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 15000);
+    return fetch(url, { ...opts, signal: ctl.signal })
+      .finally(() => clearTimeout(timer))
+      .catch((e) => {
+        if (e && e.name === "AbortError") throw new Error("通信がタイムアウトしました。電波の良い場所で再試行してください");
+        throw e;
+      });
+  }
+
   // ---------- NAVITIME (RapidAPI・正確な高速料金) ----------
   async function routeNavitime(from, to, key) {
     const base =
@@ -573,8 +592,8 @@
       "X-RapidAPI-Host": "navitime-route-car.p.rapidapi.com",
     };
     // 有料道路優先・時間重視。条件パラメータ非対応なら条件なしで再試行
-    let r = await fetch(base + "&condition=toll_time", { headers });
-    if (r.status === 400) r = await fetch(base, { headers });
+    let r = await fetchTimeout(base + "&condition=toll_time", { headers });
+    if (r.status === 400) r = await fetchTimeout(base, { headers });
     if (!r.ok) {
       const reasons = {
         401: "APIキーが正しくありません。設定タブでキーを確認してください",
@@ -589,7 +608,8 @@
     if (!item || !item.summary || !item.summary.move) throw new Error("navitime no route");
     const move = item.summary.move;
     const fare = move.fare || {};
-    // ETC普通車(unit_1025系)を優先、なければ現金(unit_1024系)
+    // ETC普通車(unit_1025系)を優先、なければ現金(unit_1024系)、
+    // どちらも無いが料金データはある場合は最小値（ETC割引相当）を採用
     let toll = null;
     for (const k of Object.keys(fare)) {
       if (k.indexOf("unit_1025") === 0) { toll = fare[k]; break; }
@@ -597,6 +617,13 @@
     if (toll == null) {
       for (const k of Object.keys(fare)) {
         if (k.indexOf("unit_1024") === 0) { toll = fare[k]; break; }
+      }
+    }
+    if (toll == null) {
+      const nums = Object.values(fare).filter((v) => typeof v === "number" && v > 0);
+      if (nums.length) {
+        toll = Math.min(...nums);
+        console.warn("NAVITIME: 想定外の料金フィールドのため最小値を採用", fare);
       }
     }
     return {
@@ -635,8 +662,15 @@
     if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
   }
 
+  // プルダウンで実在の会場が選ばれているときだけ返す（未選択""や"manual"はnull）
+  function selectedVenue() {
+    const val = $("venueSelect").value;
+    if (val === "" || val === "manual") return null;
+    return allVenues()[Number(val)] || null;
+  }
+
   function onVenueChange() {
-    const v = allVenues()[Number($("venueSelect").value)];
+    const v = selectedVenue();
     if (v) {
       $("calcKm").value = v.km;
       $("calcEtc").value = v.etc;
@@ -688,8 +722,7 @@
   function buildCopyText() {
     const c = calcValues();
     if (!c) return "";
-    const sel = $("venueSelect");
-    const v = allVenues()[Number(sel.value)];
+    const v = selectedVenue();
     const venueName = v ? v.name : "（手入力）";
     const dateVal = $("calcDate").value;
     let dateStr = "";
@@ -741,7 +774,7 @@
         div.className = "cand-item";
         div.innerHTML =
           `<div class="cname">${escapeHtml(c.name)}</div>` +
-          `<div class="caddr">${escapeHtml(c.addr)}</div>`;
+          (c.addr && c.addr !== c.name ? `<div class="caddr">${escapeHtml(c.addr)}</div>` : "");
         div.addEventListener("click", () => pickVenueCandidate(c));
         box.appendChild(div);
       });
@@ -925,15 +958,23 @@
   });
 
   // ---------- init / refresh ----------
+  const APP_VERSION = "1.1";
+  let lastGasApplied = null;
+
   function refresh() {
     renderVenueSelect();
     renderVenueList();
     renderGas();
     renderApiKey();
-    $("calcGas").value = effectiveGasPrice();
+    // 計算画面のガソリン価格は、ユーザーが手で変えていない場合のみ反映
+    const g = effectiveGasPrice();
+    const cur = parseFloat($("calcGas").value);
+    if (!(cur > 0) || cur === lastGasApplied) $("calcGas").value = g;
+    lastGasApplied = g;
     recalc();
   }
 
+  $("appVersion").textContent = APP_VERSION;
   $("headerSub").textContent =
     `集合：${D.meetingPoint.name} ／ 燃費7km/L ／ 週次価格＋10円`;
   $("meetingPointName2").textContent = D.meetingPoint.name;
