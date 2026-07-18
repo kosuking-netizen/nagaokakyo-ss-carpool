@@ -819,10 +819,16 @@
 
   // 試合の日付を変えたら、取得済みルートを新しい日付の割引条件で取り直す
   // （日付でETC休日割引が変わるため、古い料金が残らないようにする）
+  // iOSのドラムロール式ピッカーはホイール操作のたびにchangeが発火することがあるため、
+  // 0.8秒のデバウンスで最後の日付だけ取得しAPI枠の浪費を防ぐ
+  let dateRefetchTimer = null;
   $("calcDate").addEventListener("change", () => {
-    if (lastRoute && $("calcVenueName").value.trim() === lastRoute.name) {
-      fetchRouteFor({ name: lastRoute.name, lat: lastRoute.lat, lon: lastRoute.lon });
-    }
+    clearTimeout(dateRefetchTimer);
+    dateRefetchTimer = setTimeout(() => {
+      if (lastRoute && $("calcVenueName").value.trim() === lastRoute.name) {
+        fetchRouteFor({ name: lastRoute.name, lat: lastRoute.lat, lon: lastRoute.lon });
+      }
+    }, 800);
   });
 
   $("venueSearchBtn").addEventListener("click", searchVenues);
@@ -1004,7 +1010,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.14";
+  const APP_VERSION = "2.15";
   let lastGasApplied = null;
 
   function refresh() {
