@@ -353,11 +353,6 @@
       <label class="field">メモ（任意）</label>
       <input type="text" id="newMemo" placeholder="自動入力：所要時間・料金の取得元など">
 
-      <div class="hint" id="tollHint" style="display:none;">
-        高速代は<b>概算</b>です（NEXCO普通車の料金式で自動計算）。設定タブでNAVITIME APIキーを
-        設定すると正確な料金が取れます。実際に走った後、ETC明細の実額に直すこともできます。
-      </div>
-
       <button class="btn btn-primary" id="addVenueBtn">この端末に保存する</button>
 
       <div class="hint">
@@ -406,8 +401,8 @@
       <h2>NAVITIME APIキー（管理者用）</h2>
       <div class="info">
         状態：<span class="badge" id="apiKeyBadge"></span><br>
-        キーを設定すると、会場登録時に<b>NAVITIMEの正確な高速料金（ETC・普通車）と距離</b>を自動取得します。
-        未設定でも無料ルート検索＋概算料金で動作します。
+        会場の自動取得（<b>NAVITIMEの正確な高速料金（ETC・普通車）と距離</b>）に必要です。
+        未設定の端末では自動取得は使えません（登録済み会場での精算計算はキー不要で使えます）。
       </div>
       <div class="info" style="margin-top:8px;">
         キーは <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-totalnavi" target="_blank" rel="noopener">RapidAPIのNAVITIME Route(totalnavi)</a> で無料取得できます
@@ -431,7 +426,7 @@
         <li>距離・ETC料金は<b>往復分</b>（片道の2倍）</li>
         <li>燃費は <b>7km/L</b> で統一</li>
         <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」（毎週水曜夜に自動更新）</li>
-        <li>高速料金はNAVITIME（ETC・普通車）。APIキー未設定時は概算→実額修正可</li>
+        <li>高速料金はNAVITIMEの実額（ETC・普通車・往復）</li>
         <li>精算額は10円単位に四捨五入、一人あたりは10円単位に切り上げ</li>
       </ul>
       <div class="info" style="margin-top:8px;">
@@ -602,37 +597,6 @@
     };
   }
 
-  // ---------- OSRM (無料フォールバック・概算料金) ----------
-  const EXPRESSWAY_RE = /(高速|自動車道|バイパス|有料|EXPWY|Expressway)|(^|[^A-Za-z])E\d+/;
-
-  async function routeOsrm(from, to) {
-    const url =
-      `https://router.project-osrm.org/route/v1/driving/` +
-      `${from.lon},${from.lat};${to.lon},${to.lat}` +
-      `?overview=false&steps=true&alternatives=false`;
-    const r = await fetch(url);
-    if (!r.ok) throw new Error("route http " + r.status);
-    const j = await r.json();
-    if (j.code !== "Ok" || !j.routes || !j.routes.length) throw new Error("route not found");
-    const route = j.routes[0];
-    let hwyM = 0;
-    (route.legs || []).forEach((leg) =>
-      (leg.steps || []).forEach((s) => {
-        const label = (s.name || "") + " " + (s.ref || "");
-        if (EXPRESSWAY_RE.test(label)) hwyM += s.distance;
-      })
-    );
-    const hwyKm = hwyM / 1000;
-    // 概算：NEXCO普通車 24.6円/km + ターミナルチャージ150円、消費税10%、10円丸め
-    const toll = hwyKm < 1 ? 0 : Math.round(((150 + 24.6 * hwyKm) * 1.1) / 10) * 10;
-    return {
-      km: route.distance / 1000,
-      min: Math.round(route.duration / 60),
-      toll,
-      src: "estimate",
-    };
-  }
-
   // ---------- tabs ----------
   document.querySelectorAll("nav button").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -779,42 +743,35 @@
   async function pickVenueCandidate(c) {
     const mp = D.meetingPoint;
     const st = $("routeStatus");
-    st.innerHTML = '<span class="spinner"></span>ルートを計算中…';
-    let r = null;
-    let navErr = null;
     const key = apiKey();
-    if (key) {
-      try { r = await routeNavitime(mp, c, key); }
-      catch (e) {
-        navErr = (e && e.message) ? e.message : String(e);
-        console.warn("NAVITIME取得失敗:", navErr);
-      }
+    if (!key) {
+      st.innerHTML =
+        "⚠ NAVITIME APIキーが未設定のため自動取得できません。「価格・設定」タブでキーを設定してください（登録済み会場の計算は使えます）。";
+      return;
     }
-    if (!r) {
-      try { r = await routeOsrm(mp, c); }
-      catch (e) {
-        st.innerHTML = "ルート計算に失敗しました。時間をおいて再試行するか、距離を手入力してください。";
-        return;
-      }
+    st.innerHTML = '<span class="spinner"></span>NAVITIMEでルートを計算中…';
+    let r;
+    try {
+      r = await routeNavitime(mp, c, key);
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : String(e);
+      console.warn("NAVITIME取得失敗:", msg);
+      st.innerHTML =
+        `⚠ NAVITIMEの取得に失敗しました（${escapeHtml(msg)}）。` +
+        "時間をおいて再試行するか、このエラー文を管理者に伝えてください。距離・料金の手入力もできます。";
+      return;
     }
     const km = Math.round(r.km * 10) / 10;
     $("newName").value = c.name;
     $("newKm").value = km;
     $("newEtc").value = r.toll;
-    const srcLabel = r.src === "navitime" ? "NAVITIME実額(ETC普通車)" : "料金は概算";
     $("newMemo").value =
-      `約${r.min}分・` + (r.toll > 0 ? `高速あり・${srcLabel}` : "高速なし");
-    $("tollHint").style.display = r.src === "estimate" && r.toll > 0 ? "block" : "none";
+      `約${r.min}分・` + (r.toll > 0 ? "高速あり（NAVITIME・ETC普通車）" : "高速なし");
     $("venueCands").innerHTML = "";
     st.innerHTML =
       `✅ <b>${escapeHtml(c.name)}</b>：片道 ${km}km・約${r.min}分` +
-      (r.toll > 0
-        ? `・高速代 ${yen(r.toll)}（片道・${r.src === "navitime" ? "NAVITIME実額" : "概算"}）`
-        : "・高速なし") +
-      " → 下の内容を確認して保存してください" +
-      (navErr && r.src === "estimate"
-        ? `<br>⚠ NAVITIMEの取得に失敗したため概算で表示しています（${escapeHtml(navErr)}）`
-        : "");
+      (r.toll > 0 ? `・高速代 ${yen(r.toll)}（片道・NAVITIME実額）` : "・高速なし") +
+      " → 下の内容を確認して保存してください";
   }
 
   $("venueSearchBtn").addEventListener("click", searchVenues);
@@ -870,7 +827,6 @@
     $("newKm").value = "";
     $("newEtc").value = "";
     $("newMemo").value = "";
-    $("tollHint").style.display = "none";
     $("routeStatus").innerHTML = "";
     refresh();
     toast("この端末に保存しました");
@@ -929,12 +885,13 @@
     const badge = $("apiKeyBadge");
     if (apiKey()) {
       badge.className = "badge badge-shared";
-      badge.textContent = "設定済み（NAVITIME使用）";
-      $("routeModeInfo").innerHTML = "<b>NAVITIME（正確な高速料金）</b>";
+      badge.textContent = "設定済み";
+      $("routeModeInfo").innerHTML = "<b>NAVITIME（正確な高速料金・ETC普通車）</b>";
     } else {
       badge.className = "badge badge-local";
-      badge.textContent = "未設定（概算モード）";
-      $("routeModeInfo").innerHTML = "概算モード（設定タブでAPIキーを入れると正確になります）";
+      badge.textContent = "未設定";
+      $("routeModeInfo").innerHTML =
+        "⚠ APIキー未設定のため自動取得は使えません（設定タブで設定）";
     }
   }
 
