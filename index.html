@@ -60,9 +60,7 @@
     height: 2px;
     background: rgba(255,255,255,0.16);
   }
-  header h1, header .sub { position: relative; z-index: 1; }
-  header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.02em; }
-  header .sub { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+  header h1 { position: relative; z-index: 1; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; }
 
   nav {
     display: flex;
@@ -288,7 +286,6 @@
 
 <header>
   <h1>⚽ 長岡京SS 配車交通費精算</h1>
-  <div class="sub" id="headerSub"></div>
 </header>
 
 <nav>
@@ -1090,7 +1087,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.26";
+  const APP_VERSION = "2.27";
   let lastGasApplied = null;
 
   function refresh() {
@@ -1115,8 +1112,6 @@
   }
 
   $("appVersion").textContent = APP_VERSION;
-  $("headerSub").textContent =
-    `集合：${D.meetingPoint.name} ／ 燃費7km/L ／ 週次価格＋10円`;
   $("meetingPointName2").textContent = D.meetingPoint.name;
   $("dataUpdated").textContent = D.dataUpdated;
 
