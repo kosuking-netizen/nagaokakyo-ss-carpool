@@ -575,7 +575,15 @@
     // 有料道路優先・時間重視。条件パラメータ非対応なら条件なしで再試行
     let r = await fetch(base + "&condition=toll_time", { headers });
     if (r.status === 400) r = await fetch(base, { headers });
-    if (!r.ok) throw new Error("navitime http " + r.status);
+    if (!r.ok) {
+      const reasons = {
+        401: "APIキーが正しくありません。設定タブでキーを確認してください",
+        403: "RapidAPIで「NAVITIME Route(car)」がまだSubscribeされていません。Route(car)のページで Pricing → Basic($0.00) を Subscribe してください",
+        404: "APIの接続先が見つかりません（アプリの不具合の可能性）",
+        429: "今月の無料枠(500回)を使い切りました。来月まで待つか手入力してください",
+      };
+      throw new Error(reasons[r.status] || "NAVITIMEエラー http " + r.status);
+    }
     const j = await r.json();
     const item = j.items && j.items[0];
     if (!item || !item.summary || !item.summary.move) throw new Error("navitime no route");
