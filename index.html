@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>長岡京SS 配車交通費精算</title>
-<meta property="og:title" content="長岡京SS 配車交通費精算">
+<title>長岡京SS 配車交通費精算（非公式）</title>
+<meta property="og:title" content="長岡京SS 配車交通費精算（非公式）">
 <meta property="og:description" content="会場を入れるだけで配車の交通費精算額を自動計算。ルート・高速料金は毎回最新を取得。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png?v=224">
@@ -61,6 +61,7 @@
     background: rgba(255,255,255,0.16);
   }
   header h1 { position: relative; z-index: 1; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; }
+  header .unofficial { position: relative; z-index: 1; margin-top: 2px; font-size: 11px; color: rgba(255,255,255,0.85); }
 
   nav {
     display: flex;
@@ -286,6 +287,7 @@
 
 <header>
   <h1>⚽ 長岡京SS 配車交通費精算</h1>
+  <div class="unofficial">非公式：チーム公式のサービスではありません（保護者有志による運営）</div>
 </header>
 
 <nav>
@@ -450,8 +452,8 @@
     <div class="card">
       <h2>免責事項</h2>
       <ul class="info">
-        <li>本アプリは商用サービスではなく、保護者が無償で運営する<b>チーム内の精算補助ツール</b>です</li>
-        <li>金額は<b>チームルールに基づく自動計算</b>です。気になるときは「地図で距離を照合」リンクやLINEコピー文の計算根拠でご確認ください（距離・料金は手入力でも調整できます）</li>
+        <li>本アプリは<b>長岡京SSの公式サービスではありません</b>。チームとは関係のない保護者有志が個人で無償運営する<b>非公式の精算補助ツール</b>です（内容についてチームへの問い合わせはご遠慮ください）</li>
+        <li>金額は<b>以前使用していたチームルールに準じた自動計算</b>です。気になるときは「地図で距離を照合」リンクやLINEコピー文の計算根拠でご確認ください（距離・料金は手入力でも調整できます）</li>
         <li>外部サービス（NAVITIME等）の仕様変更・無料枠の制限により、予告なく自動取得が使えなくなることがあります（その場合も手入力で計算できます）</li>
         <li>無償運営のため、利用にともなう不利益の補償はいたしかねます</li>
       </ul>
@@ -461,7 +463,7 @@
       作成・運営：井沢（チーム保護者）<br>
       データ更新日：<span id="dataUpdated"></span> ／ アプリ版：<span id="appVersion"></span><br>
       会場検索・ルート・高速料金：NAVITIME ／ 住所検索：国土地理院 ／ © OpenStreetMap contributors<br>
-      本アプリは非商用の補助ツールです。金額をご確認のうえご利用ください<br>
+      本アプリはチーム非公式・非商用の補助ツールです。金額をご確認のうえご利用ください<br>
       推奨ブラウザ：Safari / Chrome（LINEアプリ内のブラウザでは表示が乱れることがあります）<br>
       表示が古いときは、数分待ってからページを再読み込みしてください
     </footer>
@@ -1087,7 +1089,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.27";
+  const APP_VERSION = "2.28";
   let lastGasApplied = null;
 
   function refresh() {
