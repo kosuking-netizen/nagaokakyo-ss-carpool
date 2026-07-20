@@ -308,8 +308,8 @@
       <div class="info">
         会場名や住所で検索して候補をタップすると、集合場所（<b id="meetingPointName2"></b>）からの
         <b>最新のルート・高速料金（NAVITIME・ETC普通車）</b>をその場で取得します。<br>
-        地図アプリの<b>「共有」でコピーした文やリンクの貼り付け</b>でも指定できます
-        （名前で出ない施設は、住所での検索や座標の貼り付けも可）。
+        名前で出ない会場は、地図アプリで会場を開いて<b>住所欄をタップしてコピー →
+        検索欄に貼り付け</b>が確実です（〒付きのままでOK。座標の貼り付けも可）。
       </div>
 
       <label class="field" style="margin-top:12px;">会場名・住所で検索</label>
@@ -424,7 +424,8 @@
       </div>
       <div class="cand-list" id="mpCands"></div>
       <div class="info" style="margin-top:6px;">
-        地図アプリの<b>「共有」でコピーした文やリンクの貼り付け</b>、座標の貼り付けでも指定できます。
+        地図アプリで場所を開いて<b>住所欄をタップしてコピー → 貼り付け</b>が確実です
+        （〒付きのままでOK。座標の貼り付けも可）。
       </div>
       <button class="btn-small btn-danger-text" id="mpResetBtn">標準の集合場所に戻す</button>
     </div>
@@ -502,9 +503,9 @@
 <div class="toast" id="toast"></div>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=232"></script>
-<script src="key.js?v=232"></script>
-<script src="calc.js?v=232"></script>
+<script src="data.js?v=233"></script>
+<script src="key.js?v=233"></script>
+<script src="calc.js?v=233"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -850,8 +851,8 @@
     if (parsed && parsed.kind === "linkOnly") {
       box.innerHTML =
         '<div class="info">このリンクだけでは場所を特定できませんでした（短縮リンクには座標が入っていません）。' +
-        '地図アプリの共有画面で<b>「コピー」を使うと場所名も一緒に</b>コピーされるので、' +
-        'コピーした文をそのまま貼り付けてください。会場名・住所での検索でも探せます。</div>';
+        '地図アプリで会場を開き、<b>住所欄をタップしてコピー → ここに貼り付け</b>てください（〒付きのままでOK）。' +
+        '会場名での検索でも探せます。</div>';
       return;
     }
     // 「場所名＋リンク」の貼り付けは、リンクを除いた場所名で検索する
@@ -863,8 +864,8 @@
       if (!cands.length) {
         box.innerHTML =
           '<div class="info">見つかりませんでした。小さな施設は名前では出ないことがあります。' +
-          '<b>①市区町村名を足す（例：太陽が丘 宇治市）</b>、<b>②施設の住所で検索</b>、' +
-          'または<b>③地図アプリの「共有」でコピーした文を貼り付け</b>をお試しください。</div>';
+          '<b>①地図アプリで施設を開き、住所欄をタップしてコピー → ここに貼り付け</b>（〒付きのままでOK・いちばん確実）、' +
+          'または<b>②市区町村名を足して検索（例：太陽が丘 宇治市）</b>をお試しください。</div>';
         return;
       }
       box.innerHTML = "";
@@ -1177,8 +1178,7 @@
     if (parsed && parsed.kind === "linkOnly") {
       box.innerHTML =
         '<div class="info">このリンクだけでは場所を特定できませんでした（短縮リンクには座標が入っていません）。' +
-        '地図アプリの共有画面で<b>「コピー」を使うと場所名も一緒に</b>コピーされるので、' +
-        'コピーした文をそのまま貼り付けてください。住所での検索でも指定できます。</div>';
+        '地図アプリで場所を開き、<b>住所欄をタップしてコピー → ここに貼り付け</b>てください（〒付きのままでOK）。</div>';
       return;
     }
     const query = parsed && parsed.kind === "query" ? parsed.query : q;
@@ -1252,7 +1252,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.32";
+  const APP_VERSION = "2.33";
   let lastGasApplied = null;
 
   function refresh() {
