@@ -406,9 +406,32 @@
     </div>
 
     <div class="card">
+      <h2>集合場所（出発地）</h2>
+      <div class="info">
+        現在の出発地：<b id="mpNameSetting"></b> <span class="badge" id="mpBadge"></span>
+      </div>
+      <div class="info" style="margin-top:6px;">
+        通常はチーム標準の集合場所のままで使ってください。自宅などから直接向かうときだけ、
+        <b>この端末に限って</b>出発地を変更できます（他の人のアプリには影響しません）。
+      </div>
+      <label class="field">場所の名前・住所で検索して変更</label>
+      <div class="row">
+        <div><input type="search" id="mpQuery" placeholder="例：阪急長岡天神駅 / 自宅の住所"></div>
+        <div style="flex:0 0 auto;">
+          <button class="btn-small" id="mpSearchBtn" style="margin-top:0;padding:11px 16px;">検索</button>
+        </div>
+      </div>
+      <div class="cand-list" id="mpCands"></div>
+      <div class="info" style="margin-top:6px;">
+        座標の貼り付け（Googleマップで地点を長押し→座標をコピー→検索欄へ）でも指定できます。
+      </div>
+      <button class="btn-small btn-danger-text" id="mpResetBtn">標準の集合場所に戻す</button>
+    </div>
+
+    <div class="card">
       <h2>精算ルール</h2>
       <ul class="info">
-        <li>集合場所：<b>ローソン長岡京インター店</b> → 会場の<b>時間最短ルート</b>（有料道路優先）</li>
+        <li>集合場所：<b>ローソン長岡京インター店</b>（標準）→ 会場の<b>時間最短ルート</b>（有料道路優先）。出発地は上の「集合場所（出発地）」からこの端末だけ変更できます</li>
         <li>ルート・高速料金は<b>計算のたびにNAVITIMEから最新を取得</b>（道路や料金の変更に自動追従）</li>
         <li>距離・ETC料金は<b>往復分</b>（片道の2倍）</li>
         <li>燃費は <b>7km/L</b> で統一</li>
@@ -494,6 +517,7 @@
   const LS_GAS = "nss_gasOverride";
   const LS_APIKEY = "nss_rapidApiKey";
   const LS_HISTORY = "nss_venueHistory";
+  const LS_MP = "nss_meetingPointOverride";
   const HISTORY_MAX = 8;
 
   // ---------- utilities ----------
@@ -523,6 +547,17 @@
   function gasOverride() {
     try { return JSON.parse(lsGet(LS_GAS)); }
     catch { return null; }
+  }
+  // 出発地の上書き（この端末のみ）。壊れたデータや座標欠けは無視して標準に戻す
+  function meetingOverride() {
+    try {
+      const o = JSON.parse(lsGet(LS_MP));
+      if (o && o.name && isFinite(o.lat) && isFinite(o.lon)) return o;
+      return null;
+    } catch { return null; }
+  }
+  function effectiveMeetingPoint() {
+    return meetingOverride() || D.meetingPoint;
   }
   function effectiveGasPrice() {
     const ov = gasOverride();
@@ -695,8 +730,8 @@
       );
       if (!dup) uniq.push(r);
     });
-    // 集合場所から近い順に並べ替え（遠方の同名地名を下へ）
-    const mp = D.meetingPoint;
+    // 集合場所（出発地）から近い順に並べ替え（遠方の同名地名を下へ）
+    const mp = effectiveMeetingPoint();
     uniq.sort(
       (a, b) =>
         (Math.abs(a.lat - mp.lat) + Math.abs(a.lon - mp.lon)) -
@@ -837,7 +872,7 @@
   let lastRoute = null;
 
   async function fetchRouteFor(place) {
-    const mp = D.meetingPoint;
+    const mp = effectiveMeetingPoint();
     const st = $("routeStatus");
     const seq = ++routeReqSeq;
     $("calcVenueName").value = place.name;
@@ -1004,10 +1039,13 @@
       venueName === lastRoute.name && c.km === lastRoute.km && c.etc === lastRoute.toll
         ? `高速区間：${lastRoute.ics.join("→")}`
         : null;
+    // 標準と違う出発地で計算した金額は、受け取る側が気づけるよう明記する
+    const mpOv = meetingOverride();
     return [
       "【⚽交通費精算】長岡京SS",
       dateStr ? `日付：${dateStr}` : null,
       `会場：${venueName}`,
+      mpOv ? `出発地：${mpOv.name}（標準の集合場所とは異なります）` : null,
       `往復距離：${c.rtKm.toFixed(1)}km（片道${c.km.toFixed(1)}km）`,
       `高速代（ETC往復）：${yen(c.toll)}`,
       icLine,
@@ -1060,6 +1098,91 @@
     toast("自動更新の価格に戻しました");
   });
 
+  // ---------- 集合場所（出発地）の設定 ----------
+  function renderMeetingPoint() {
+    const ov = meetingOverride();
+    const mp = effectiveMeetingPoint();
+    $("mpNameSetting").textContent = mp.name;
+    const badge = $("mpBadge");
+    if (ov) {
+      badge.className = "badge badge-local";
+      badge.textContent = "この端末で変更中";
+    } else {
+      badge.className = "badge badge-shared";
+      badge.textContent = "チーム標準";
+    }
+    // 計算タブの説明文にも現在の出発地を反映
+    $("meetingPointName2").textContent = mp.name;
+  }
+
+  function applyMeetingPoint(place) {
+    lsSet(LS_MP, JSON.stringify({ name: place.name, lat: place.lat, lon: place.lon }));
+    $("mpCands").innerHTML = "";
+    $("mpQuery").value = "";
+    refresh();
+    toast("出発地を変更しました（この端末のみ）");
+    refetchAfterMeetingChange();
+  }
+
+  // 出発地が変わったら、取得済みの会場ルートは古い起点の距離・料金のため取り直す
+  function refetchAfterMeetingChange() {
+    if (lastRoute && $("calcVenueName").value.trim() === lastRoute.name) {
+      fetchRouteFor({ name: lastRoute.name, lat: lastRoute.lat, lon: lastRoute.lon });
+    } else {
+      // 会場が手入力等で不一致なら再取得はせず、旧出発地のルート表示だけ消す
+      // （「地図で距離を照合」リンクが古い出発地のまま残るのを防ぐ）
+      lastRoute = null;
+      $("routeStatus").innerHTML = "";
+    }
+  }
+
+  async function searchMeetingPoint() {
+    const q = $("mpQuery").value.trim();
+    if (!q) { toast("場所の名前か住所を入力してください"); return; }
+    const box = $("mpCands");
+
+    // 会場検索と同じく「34.9176, 135.6862」形式の座標も直接受け付ける
+    const co = /^\s*([2-4]\d(?:\.\d+)?)\s*[,、\s]\s*(1[2-5]\d(?:\.\d+)?)\s*$/.exec(q);
+    if (co) {
+      applyMeetingPoint({ name: "（座標で指定した出発地）", lat: parseFloat(co[1]), lon: parseFloat(co[2]) });
+      return;
+    }
+
+    box.innerHTML = '<div class="info"><span class="spinner"></span>検索中…</div>';
+    try {
+      const cands = await geocode(q);
+      if (!cands.length) {
+        box.innerHTML =
+          '<div class="info">見つかりませんでした。住所での検索、または座標の貼り付けをお試しください。</div>';
+        return;
+      }
+      box.innerHTML = "";
+      cands.forEach((c) => {
+        const div = document.createElement("div");
+        div.className = "cand-item";
+        div.innerHTML =
+          `<div class="cname">${escapeHtml(c.name)}</div>` +
+          (c.addr && c.addr !== c.name ? `<div class="caddr">${escapeHtml(c.addr)}</div>` : "");
+        div.addEventListener("click", () => applyMeetingPoint(c));
+        box.appendChild(div);
+      });
+    } catch (e) {
+      box.innerHTML = '<div class="info">検索でエラーが発生しました。通信環境を確認してもう一度お試しください。</div>';
+    }
+  }
+
+  $("mpSearchBtn").addEventListener("click", searchMeetingPoint);
+  $("mpQuery").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) searchMeetingPoint();
+  });
+  $("mpResetBtn").addEventListener("click", () => {
+    lsDel(LS_MP);
+    $("mpCands").innerHTML = "";
+    refresh();
+    toast("標準の集合場所に戻しました");
+    refetchAfterMeetingChange();
+  });
+
   function renderApiKey() {
     const badge = $("apiKeyBadge");
     if (personalKey()) {
@@ -1094,11 +1217,12 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.29";
+  const APP_VERSION = "2.30";
   let lastGasApplied = null;
 
   function refresh() {
     renderGas();
+    renderMeetingPoint();
     renderApiKey();
     renderHistory();
     renderQuota();
@@ -1119,7 +1243,6 @@
   }
 
   $("appVersion").textContent = APP_VERSION;
-  $("meetingPointName2").textContent = D.meetingPoint.name;
   $("dataUpdated").textContent = D.dataUpdated;
 
   const today = new Date();
