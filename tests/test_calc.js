@@ -2,7 +2,7 @@
 // pushのたびに実行し、1つでも期待値と違えば失敗として通知される。
 "use strict";
 const assert = require("assert");
-const { calcSettlement } = require("../calc.js");
+const { calcSettlement, extractCoords, parsePastedLocation } = require("../calc.js");
 
 const base = { fuelEfficiency: 7, gasSurcharge: 10 };
 
@@ -48,5 +48,63 @@ assert.strictEqual(calcSettlement({ ...base, km: 10, gas: 0 }), null);
 assert.strictEqual(calcSettlement({ ...base, km: -5, gas: 170 }), null);
 assert.strictEqual(calcSettlement({ ...base, km: 10, gas: 170, etc: -100 }), null);
 assert.strictEqual(calcSettlement({ ...base, km: "abc", gas: 170 }), null);
+
+// ---------- 地図共有リンク・座標の解析 ----------
+
+// Googleマップの長いURL（PC・共有）：!3d!4d のピン座標を最優先で使う
+assert.deepStrictEqual(
+  extractCoords("https://www.google.com/maps/place/%E5%A4%AA%E9%99%BD%E3%81%8C%E4%B8%98/@34.87,135.79,17z/data=!3m1!4b1!4m6!3m5!8m2!3d34.8721!4d135.7954"),
+  { lat: 34.8721, lon: 135.7954 }
+);
+// ピン座標がなければ @（地図中心）を使う
+assert.deepStrictEqual(
+  extractCoords("https://www.google.com/maps/@34.9176,135.6862,15z"),
+  { lat: 34.9176, lon: 135.6862 }
+);
+// Appleマップの共有リンク（ll=）
+assert.deepStrictEqual(
+  extractCoords("https://maps.apple.com/?address=%E4%BA%AC%E9%83%BD&ll=34.9176,135.6862&q=%E3%83%AD%E3%83%BC%E3%82%BD%E3%83%B3"),
+  { lat: 34.9176, lon: 135.6862 }
+);
+// q=lat,lon 形式（%2CエンコードもOK）
+assert.deepStrictEqual(
+  extractCoords("https://maps.google.com/?q=34.5975%2C135.7935"),
+  { lat: 34.5975, lon: 135.7935 }
+);
+// 素の座標貼り付け（従来形式：カンマ・読点・空白区切り）
+assert.deepStrictEqual(extractCoords("34.5975, 135.7935"), { lat: 34.5975, lon: 135.7935 });
+assert.deepStrictEqual(extractCoords("34.6　135.8"), { lat: 34.6, lon: 135.8 });
+// 短縮リンクは座標を含まないのでnull
+assert.strictEqual(extractCoords("https://maps.app.goo.gl/YJBqUGtbumCmt9aa7"), null);
+// 日本の範囲外（海外座標）は無効
+assert.strictEqual(extractCoords("https://www.google.com/maps/@51.5074,-0.1278,12z"), null);
+// ただの文字列・空はnull
+assert.strictEqual(extractCoords("太陽が丘"), null);
+assert.strictEqual(extractCoords(""), null);
+
+// parsePastedLocation：ただの検索語はnull（通常検索に回す）
+assert.strictEqual(parsePastedLocation("太陽が丘"), null);
+// 場所名＋短縮リンク（iPhoneのGoogleマップ共有「コピー」の形式）→ 場所名で検索
+let p = parsePastedLocation("ほぐし屋 https://maps.app.goo.gl/YJBqUGtbumCmt9aa7");
+assert.strictEqual(p.kind, "query");
+assert.strictEqual(p.query, "ほぐし屋");
+// 短縮リンク単体 → linkOnly（案内を出す）
+p = parsePastedLocation("https://maps.app.goo.gl/YJBqUGtbumCmt9aa7");
+assert.strictEqual(p.kind, "linkOnly");
+// 場所名＋座標入りリンク → 座標＋名前
+p = parsePastedLocation("会場A https://maps.apple.com/?ll=34.9,135.6");
+assert.strictEqual(p.kind, "coords");
+assert.deepStrictEqual(p.coords, { lat: 34.9, lon: 135.6 });
+assert.strictEqual(p.name, "会場A");
+assert.strictEqual(p.viaLink, true);
+// 座標入りリンク単体（Appleマップのq=場所名を名前に使う）
+p = parsePastedLocation("https://maps.apple.com/?ll=34.9,135.6&q=%E4%BC%9A%E5%A0%B4B");
+assert.strictEqual(p.kind, "coords");
+assert.strictEqual(p.name, "会場B");
+// 素の座標貼り付け → 名前なし・リンク経由でない
+p = parsePastedLocation("34.5975, 135.7935");
+assert.strictEqual(p.kind, "coords");
+assert.strictEqual(p.name, "");
+assert.strictEqual(p.viaLink, false);
 
 console.log("✅ 計算テスト すべて合格");

@@ -308,7 +308,8 @@
       <div class="info">
         会場名や住所で検索して候補をタップすると、集合場所（<b id="meetingPointName2"></b>）からの
         <b>最新のルート・高速料金（NAVITIME・ETC普通車）</b>をその場で取得します。<br>
-        名前で出ない施設は、<b>住所での検索</b>や<b>座標の貼り付け</b>（Googleマップで地点を長押し→座標をコピー→検索欄へ）でも指定できます。
+        地図アプリの<b>「共有」でコピーした文やリンクの貼り付け</b>でも指定できます
+        （名前で出ない施設は、住所での検索や座標の貼り付けも可）。
       </div>
 
       <label class="field" style="margin-top:12px;">会場名・住所で検索</label>
@@ -423,7 +424,7 @@
       </div>
       <div class="cand-list" id="mpCands"></div>
       <div class="info" style="margin-top:6px;">
-        座標の貼り付け（Googleマップで地点を長押し→座標をコピー→検索欄へ）でも指定できます。
+        地図アプリの<b>「共有」でコピーした文やリンクの貼り付け</b>、座標の貼り付けでも指定できます。
       </div>
       <button class="btn-small btn-danger-text" id="mpResetBtn">標準の集合場所に戻す</button>
     </div>
@@ -500,9 +501,10 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="data.js"></script>
-<script src="key.js"></script>
-<script src="calc.js"></script>
+<!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
+<script src="data.js?v=231"></script>
+<script src="key.js?v=231"></script>
+<script src="calc.js?v=231"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -832,25 +834,44 @@
     const box = $("venueCands");
     $("routeStatus").innerHTML = "";  // 前の会場の取得結果表示を消す
 
-    // 「34.5975, 135.7935」形式の座標（Googleマップ長押しでコピーできる）を直接受け付ける
-    const co = /^\s*([2-4]\d(?:\.\d+)?)\s*[,、\s]\s*(1[2-5]\d(?:\.\d+)?)\s*$/.exec(q);
-    if (co) {
+    // 座標や地図アプリの共有リンク（場所名つきテキスト含む）を直接受け付ける
+    const parsed = window.NSS_CALC.parsePastedLocation(q);
+    if (parsed && parsed.kind === "coords") {
       box.innerHTML = "";
-      fetchRouteFor({ name: "（座標で指定した会場）", lat: parseFloat(co[1]), lon: parseFloat(co[2]) });
+      fetchRouteFor({
+        name: parsed.name || (parsed.viaLink ? "（共有リンクで指定した会場）" : "（座標で指定した会場）"),
+        lat: parsed.coords.lat,
+        lon: parsed.coords.lon,
+      });
       return;
     }
+    if (parsed && parsed.kind === "linkOnly") {
+      box.innerHTML =
+        '<div class="info">このリンクだけでは場所を特定できませんでした（短縮リンクには座標が入っていません）。' +
+        '地図アプリの共有画面で<b>「コピー」を使うと場所名も一緒に</b>コピーされるので、' +
+        'コピーした文をそのまま貼り付けてください。会場名・住所での検索でも探せます。</div>';
+      return;
+    }
+    // 「場所名＋リンク」の貼り付けは、リンクを除いた場所名で検索する
+    const query = parsed && parsed.kind === "query" ? parsed.query : q;
 
     box.innerHTML = '<div class="info"><span class="spinner"></span>検索中…</div>';
     try {
-      const cands = await geocode(q);
+      const cands = await geocode(query);
       if (!cands.length) {
         box.innerHTML =
           '<div class="info">見つかりませんでした。小さな施設は名前では出ないことがあります。' +
           '<b>①市区町村名を足す（例：太陽が丘 宇治市）</b>、<b>②施設の住所で検索</b>、' +
-          'または<b>③Googleマップで地点を長押し→座標をコピーして検索欄に貼り付け</b>をお試しください。</div>';
+          'または<b>③地図アプリの「共有」でコピーした文を貼り付け</b>をお試しください。</div>';
         return;
       }
       box.innerHTML = "";
+      if (parsed && parsed.kind === "query") {
+        const note = document.createElement("div");
+        note.className = "info";
+        note.innerHTML = `リンクに添えられた場所名「<b>${escapeHtml(query)}</b>」で検索しました。会場をタップしてください：`;
+        box.appendChild(note);
+      }
       cands.forEach((c) => {
         const div = document.createElement("div");
         div.className = "cand-item";
@@ -1141,16 +1162,28 @@
     if (!q) { toast("場所の名前か住所を入力してください"); return; }
     const box = $("mpCands");
 
-    // 会場検索と同じく「34.9176, 135.6862」形式の座標も直接受け付ける
-    const co = /^\s*([2-4]\d(?:\.\d+)?)\s*[,、\s]\s*(1[2-5]\d(?:\.\d+)?)\s*$/.exec(q);
-    if (co) {
-      applyMeetingPoint({ name: "（座標で指定した出発地）", lat: parseFloat(co[1]), lon: parseFloat(co[2]) });
+    // 会場検索と同じく、座標や地図アプリの共有リンクの貼り付けも受け付ける
+    const parsed = window.NSS_CALC.parsePastedLocation(q);
+    if (parsed && parsed.kind === "coords") {
+      applyMeetingPoint({
+        name: parsed.name || (parsed.viaLink ? "（共有リンクで指定した出発地）" : "（座標で指定した出発地）"),
+        lat: parsed.coords.lat,
+        lon: parsed.coords.lon,
+      });
       return;
     }
+    if (parsed && parsed.kind === "linkOnly") {
+      box.innerHTML =
+        '<div class="info">このリンクだけでは場所を特定できませんでした（短縮リンクには座標が入っていません）。' +
+        '地図アプリの共有画面で<b>「コピー」を使うと場所名も一緒に</b>コピーされるので、' +
+        'コピーした文をそのまま貼り付けてください。住所での検索でも指定できます。</div>';
+      return;
+    }
+    const query = parsed && parsed.kind === "query" ? parsed.query : q;
 
     box.innerHTML = '<div class="info"><span class="spinner"></span>検索中…</div>';
     try {
-      const cands = await geocode(q);
+      const cands = await geocode(query);
       if (!cands.length) {
         box.innerHTML =
           '<div class="info">見つかりませんでした。住所での検索、または座標の貼り付けをお試しください。</div>';
@@ -1217,7 +1250,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.30";
+  const APP_VERSION = "2.31";
   let lastGasApplied = null;
 
   function refresh() {

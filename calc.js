@@ -1,5 +1,5 @@
 // ============================================================
-// 長岡京SS 配車交通費精算 — 計算ロジック（純関数）
+// 長岡京SS 配車交通費精算 — 計算ロジック・共有テキスト解析（純関数）
 // index.html から使用し、tests/test_calc.js で自動テストされる。
 //
 // 計算式（チームルール）:
@@ -33,7 +33,65 @@
     return { km, etc, gas, pax, rtKm, unit, fuel, toll, totalRaw, total, per };
   }
 
-  const api = { calcSettlement };
+  // ------------------------------------------------------------
+  // 地図アプリの共有テキスト解析（純関数・検索欄への貼り付けで使用）
+  // ------------------------------------------------------------
+
+  // テキスト・URLから日本国内の座標を取り出す。見つからなければnull。
+  // 対応：Googleマップの長いURL（!3d!4d / @lat,lon / q=lat,lon）、
+  //       Appleマップの共有リンク（ll= / coordinate= 等）、geo:、素の座標貼り付け。
+  // ※maps.app.goo.gl等の短縮リンクは座標がURLに含まれないため対象外
+  //   （リダイレクト先の取得はCORS制限でブラウザからは不可能。
+  //    展開先ページのcenter=はIP位置ベースの誤座標になることを確認済み）
+  function extractCoords(text) {
+    if (text == null || text === "") return null;
+    let t = String(text);
+    try { t = decodeURIComponent(t); } catch {} // %2C等を復元（不正な%は元のまま）
+    const pats = [
+      /!3d(\d{1,2}\.\d+)!4d(\d{1,3}\.\d+)/,                  // Googleのピン座標（最優先）
+      /[?&;](?:q|ll|sll|center|coordinate|daddr|destination)=(\d{1,2}\.\d+),\s*(\d{1,3}\.\d+)/,
+      /@(\d{1,2}\.\d+),(\d{1,3}\.\d+)/,                      // URL中の地図中心
+      /\bgeo:(\d{1,2}\.\d+),(\d{1,3}\.\d+)/,
+      /^\s*(\d{1,2}(?:\.\d+)?)\s*[,、\s]\s*(\d{1,3}(?:\.\d+)?)\s*$/, // 素の座標
+    ];
+    for (let i = 0; i < pats.length; i++) {
+      const m = pats[i].exec(t);
+      if (!m) continue;
+      const lat = parseFloat(m[1]);
+      const lon = parseFloat(m[2]);
+      // 日本国内の範囲のみ有効（従来の座標貼り付けと同じ範囲）
+      if (lat >= 20 && lat < 50 && lon >= 120 && lon < 160) return { lat, lon };
+    }
+    return null;
+  }
+
+  // 検索欄への貼り付けを解釈する。戻り値：
+  //   { kind:"coords", coords:{lat,lon}, name, viaLink } … その座標をそのまま使う
+  //   { kind:"query",  query } … リンクに添えられた場所名で検索し直す
+  //   { kind:"linkOnly" }      … 短縮リンク単体（場所を特定できない→案内を出す）
+  //   null                     … URLでも座標でもない、ただの検索語
+  function parsePastedLocation(raw) {
+    if (raw == null) return null;
+    const s = String(raw);
+    const hasUrl = /https?:\/\//.test(s);
+    const coords = extractCoords(s);
+    if (!hasUrl && !coords) return null;
+    // URL以外の部分（共有の「コピー」では場所名が一緒に入ることが多い）
+    let name = s.replace(/https?:\/\/[^\s]+/g, " ").replace(/\s+/g, " ").trim();
+    if (name && extractCoords(name)) name = ""; // 残りが座標そのものなら名前ではない
+    if (!name && hasUrl) {
+      // AppleマップのURL等に含まれる q=場所名 を会場名として拾う
+      let t = s;
+      try { t = decodeURIComponent(s); } catch {}
+      const m = /[?&]q=([^&\s]+)/.exec(t);
+      if (m && !/^[\d.,]+$/.test(m[1])) name = m[1].replace(/\+/g, " ");
+    }
+    if (coords) return { kind: "coords", coords, name, viaLink: hasUrl };
+    if (name.length >= 2) return { kind: "query", query: name };
+    return { kind: "linkOnly" };
+  }
+
+  const api = { calcSettlement, extractCoords, parsePastedLocation };
   root.NSS_CALC = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
