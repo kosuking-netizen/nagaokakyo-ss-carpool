@@ -502,9 +502,9 @@
 <div class="toast" id="toast"></div>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=231"></script>
-<script src="key.js?v=231"></script>
-<script src="calc.js?v=231"></script>
+<script src="data.js?v=232"></script>
+<script src="key.js?v=232"></script>
+<script src="calc.js?v=232"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -682,6 +682,8 @@
   }
 
   async function geocode(q) {
+    // 〒付き住所（Googleマップの「住所をコピー」形式）でも検索が通るよう正規化
+    q = window.NSS_CALC.normalizeSearchQuery(q);
     const key = apiKey();
     const [navi, osm, gsi] = await Promise.all([
       key
@@ -1250,7 +1252,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.31";
+  const APP_VERSION = "2.32";
   let lastGasApplied = null;
 
   function refresh() {

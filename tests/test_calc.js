@@ -2,7 +2,7 @@
 // pushのたびに実行し、1つでも期待値と違えば失敗として通知される。
 "use strict";
 const assert = require("assert");
-const { calcSettlement, extractCoords, parsePastedLocation } = require("../calc.js");
+const { calcSettlement, extractCoords, parsePastedLocation, normalizeSearchQuery } = require("../calc.js");
 
 const base = { fuelEfficiency: 7, gasSurcharge: 10 };
 
@@ -106,5 +106,22 @@ p = parsePastedLocation("34.5975, 135.7935");
 assert.strictEqual(p.kind, "coords");
 assert.strictEqual(p.name, "");
 assert.strictEqual(p.viaLink, false);
+
+// ---------- 検索語の正規化（〒付き住所） ----------
+
+// Googleマップ「住所をコピー」の形式 → 郵便番号を除去
+assert.strictEqual(
+  normalizeSearchQuery("〒240-0013 神奈川県横浜市保土ケ谷区帷子町1丁目44"),
+  "神奈川県横浜市保土ケ谷区帷子町1丁目44"
+);
+// 「日本、〒…」プレフィックス（Googleマップで付くことがある）も除去
+assert.strictEqual(
+  normalizeSearchQuery("日本、〒615-8262 京都府京都市西京区"),
+  "京都府京都市西京区"
+);
+// 〒なしの番地ハイフンは消さない
+assert.strictEqual(normalizeSearchQuery("帷子町1丁目44-33"), "帷子町1丁目44-33");
+// 通常の検索語はそのまま
+assert.strictEqual(normalizeSearchQuery("太陽が丘"), "太陽が丘");
 
 console.log("✅ 計算テスト すべて合格");

@@ -91,7 +91,18 @@
     return { kind: "linkOnly" };
   }
 
-  const api = { calcSettlement, extractCoords, parsePastedLocation };
+  // 検索語の正規化：Googleマップ「住所をコピー」の形式（〒615-8262 京都府… や
+  // 日本、〒…）をそのまま貼っても住所検索が通るように、郵便番号・国名を取り除く。
+  // ※郵便番号は〒付きのときだけ除去（「44-33」のような番地を誤って消さないため）
+  function normalizeSearchQuery(q) {
+    return String(q)
+      .replace(/〒\s*[0-9０-９]{3}[-ー−‐][0-9０-９]{4}\s*/g, " ")
+      .replace(/(^|\s)日本[、,]\s*/g, "$1")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  const api = { calcSettlement, extractCoords, parsePastedLocation, normalizeSearchQuery };
   root.NSS_CALC = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
