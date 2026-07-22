@@ -6,10 +6,10 @@
 //   ガソリン代 = 往復距離 ÷ 燃費7km/L × (週次ガソリン価格 + 10円) を1円単位に四捨五入
 //   高速代     = ETC片道 × 2
 //   駐車場代   = 手入力の実費をそのまま加算（往復2倍しない）
-//   精算額     = ガソリン代 + 高速代 + 駐車場代 を10円単位に四捨五入
-//   一人あたり = 精算額 ÷ 割り勘人数 を10円単位に切り上げ（2人以上のとき）
-// ※丸めは「ガソリン代を先に1円丸め→合計を10円丸め」の順。表示される内訳の
-//   合計と精算額が常に一致し、受け取った人が検算できることを優先している。
+//   精算額     = ガソリン代 + 高速代 + 駐車場代（丸めなし・1円単位）
+//   一人あたり = 精算額 ÷ 割り勘人数 を1円単位に切り上げ（2人以上のとき）
+// ※PayPay精算に合わせて10円丸めは廃止（v2.36）。ガソリン代のみ1円単位に
+//   四捨五入し、内訳の合計と精算額が常に一致して検算できることを優先している。
 // ============================================================
 (function (root) {
   "use strict";
@@ -30,8 +30,8 @@
     const fuel = Math.round((rtKm / fuelEff) * unit);
     const toll = Math.round(etc * 2);
     const totalRaw = fuel + toll + Math.round(parking);
-    const total = Math.round(totalRaw / 10) * 10;
-    const per = pax >= 2 ? Math.ceil(total / pax / 10) * 10 : null;
+    const total = totalRaw;
+    const per = pax >= 2 ? Math.ceil(total / pax) : null;
     return { km, etc, parking: Math.round(parking), gas, pax, rtKm, unit, fuel, toll, totalRaw, total, per };
   }
 

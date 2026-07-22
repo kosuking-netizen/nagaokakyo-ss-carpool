@@ -376,7 +376,7 @@
           <tr><td>高速代（ETC往復）</td><td id="rToll"></td></tr>
           <tr id="rParkingRow" style="display:none;"><td>駐車場代（実費）</td><td id="rParking"></td></tr>
           <tr class="total"><td>精算額</td><td id="rTotal"></td></tr>
-          <tr class="per" id="rPerRow" style="display:none;"><td>一人あたり<span style="font-size:11px;color:var(--gray);">（10円切上げ）</span></td><td id="rPer"></td></tr>
+          <tr class="per" id="rPerRow" style="display:none;"><td>一人あたり<span style="font-size:11px;color:var(--gray);">（端数切上げ）</span></td><td id="rPer"></td></tr>
         </table>
         <div class="note" id="rNote"></div>
         <div class="note">※あくまで<b>補助ツール</b>による自動計算です。金額の正確性を100%保証するものではありません。必ず内容をご確認のうえご利用ください</div>
@@ -450,11 +450,11 @@
         <li>ETC料金は<b>「試合の日付」の朝8時出発</b>として計算します（土日祝の<b>ETC休日割引を自動反映</b>。日付を変えるとルート・料金を取り直します）</li>
         <li>ガソリン単価は<b>計算した時点の最新週の価格</b>を使います（試合直後の精算を想定した割り切り仕様。週ごとの価格差は通常±1〜2円/Lで、精算額への影響は数十円未満）</li>
         <li>駐車場代がかかった場合は<b>実費を手入力</b>（かかった金額をそのまま加算。往復2倍はしません）</li>
-        <li>丸め方：ガソリン代を1円単位に四捨五入 → 高速代・駐車場代と合計して10円単位に四捨五入 ／ 一人あたりは10円単位に切り上げ</li>
+        <li>丸め方：ガソリン代のみ1円単位に四捨五入。精算額は内訳の合計そのまま（<b>10円丸めは廃止・PayPay精算対応</b>）／ 一人あたりは1円単位に切り上げ</li>
       </ul>
       <div class="info" style="margin-top:8px;">
         計算式：<b>精算額 ＝ 往復距離 ÷ 7 ×（週次価格＋10円）＋ ETC片道×2 ＋ 駐車場代（実費）</b><br>
-        一人あたり ＝ 精算額 ÷ 割り勘人数（10円単位切り上げ）
+        一人あたり ＝ 精算額 ÷ 割り勘人数（1円単位切り上げ）
       </div>
     </div>
 
@@ -513,9 +513,9 @@
 <div class="toast" id="toast"></div>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=235"></script>
-<script src="key.js?v=235"></script>
-<script src="calc.js?v=235"></script>
+<script src="data.js?v=236"></script>
+<script src="key.js?v=236"></script>
+<script src="calc.js?v=236"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -1047,7 +1047,7 @@
       $("rPerRow").style.display = "none";
     }
     $("rNote").textContent =
-      `単価 ${c.gas.toFixed(1)}＋10＝${c.unit.toFixed(1)}円/L ／ 燃費7km/L ／ ガソリン代＋高速代${c.parking > 0 ? "＋駐車場代" : ""}＝${yen(c.totalRaw)} を10円単位に四捨五入`;
+      `単価 ${c.gas.toFixed(1)}＋10＝${c.unit.toFixed(1)}円/L ／ 燃費7km/L ／ 精算額＝ガソリン代＋高速代${c.parking > 0 ? "＋駐車場代" : ""}そのまま（丸めなし）`;
     const warns = calcWarnings(c);
     const wBox = $("rWarn");
     if (warns.length) {
@@ -1273,7 +1273,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.35";
+  const APP_VERSION = "2.36";
   let lastGasApplied = null;
 
   function refresh() {

@@ -11,20 +11,20 @@ let c = calcSettlement({ ...base, km: 25, etc: 1050, gas: 173.4, pax: 3 });
 assert.strictEqual(c.rtKm, 50);
 assert.strictEqual(c.fuel, 1310);   // 50÷7×183.4 = 1310.0
 assert.strictEqual(c.toll, 2100);   // 1050×2
-assert.strictEqual(c.total, 3410);  // 3410はすでに10円単位
-assert.strictEqual(c.per, 1140);    // 3410÷3=1136.7 → 10円切り上げ
+assert.strictEqual(c.total, 3410);  // 丸めなし（=内訳の合計そのまま）
+assert.strictEqual(c.per, 1137);    // 3410÷3=1136.67 → 1円単位に切り上げ
 
 // 駐車場代あり（実費をそのまま加算。往復2倍しない）
 c = calcSettlement({ ...base, km: 25, etc: 1050, gas: 173.4, pax: 3, parking: 500 });
 assert.strictEqual(c.parking, 500);
 assert.strictEqual(c.totalRaw, 3910); // 1310+2100+500
 assert.strictEqual(c.total, 3910);
-assert.strictEqual(c.per, 1310);      // 3910÷3=1303.3 → 10円切り上げ
+assert.strictEqual(c.per, 1304);      // 3910÷3=1303.33 → 1円切り上げ
 
-// 駐車場代の端数も10円丸めの対象（515+300=815 → 820）
+// 精算額は丸めない（PayPay精算・v2.36で10円丸めを廃止）
 c = calcSettlement({ ...base, km: 10, etc: 0, gas: 170.1, parking: 300 });
-assert.strictEqual(c.totalRaw, 815);
-assert.strictEqual(c.total, 820);
+assert.strictEqual(c.totalRaw, 815);  // 515+300
+assert.strictEqual(c.total, 815);     // そのまま（10円丸めしない）
 
 // 駐車場代 未入力・空欄は0扱い、負の値はnull
 c = calcSettlement({ ...base, km: 10, etc: 0, gas: 170, parking: "" });
@@ -33,27 +33,24 @@ assert.strictEqual(calcSettlement({ ...base, km: 10, gas: 170, parking: -100 }),
 
 // 高速なし・人数未入力（一人あたりは出さない）
 c = calcSettlement({ ...base, km: 10, etc: 0, gas: 170, pax: 0 });
-assert.strictEqual(c.fuel, 514);    // 20÷7×180 = 514.28…
+assert.strictEqual(c.fuel, 514);    // 20÷7×180 = 514.28… → 1円四捨五入
 assert.strictEqual(c.toll, 0);
-assert.strictEqual(c.total, 510);   // 514 → 四捨五入で510
+assert.strictEqual(c.total, 514);   // 丸めなし
 assert.strictEqual(c.per, null);
 
-// 丸め境界（合計が○5円 → 四捨五入で切り上がる）
-c = calcSettlement({ ...base, km: 7, etc: 0, gas: 162.5 });
-assert.strictEqual(c.totalRaw, 345); // 14÷7×172.5 = 345
-assert.strictEqual(c.total, 350);
-
-// 一人あたりの切り上げ（1020÷4=255 → 10円単位に切り上げて260）
+// 一人あたりの切り上げ（1024÷4=256 割り切れる場合はそのまま）
 c = calcSettlement({ ...base, km: 10, etc: 255, gas: 170, pax: 4 });
-assert.strictEqual(c.total, 1020);  // 514+510=1024 → 1020
-assert.strictEqual(c.per, 260);     // 1020÷4=255 → 10円切り上げで260
+assert.strictEqual(c.total, 1024);  // 514+510
+assert.strictEqual(c.per, 256);     // 1024÷4=256（端数なし）
 
-// 丸め順序の仕様固定：ガソリン代を先に1円丸め→合計を10円丸め
-// （生値514.57円 → ガソリン代515円 → 精算額520円。
-//   もし生値のまま10円丸めすると510円になり仕様と異なる）
+// 一人あたりの端数は1円単位に切り上げ（運転者が端数で損しない）
+c = calcSettlement({ ...base, km: 10, etc: 255, gas: 170, pax: 3 });
+assert.strictEqual(c.per, 342);     // 1024÷3=341.33… → 342
+
+// 丸め順序の仕様固定：ガソリン代のみ1円四捨五入し、合計はそのまま
 c = calcSettlement({ ...base, km: 10, etc: 0, gas: 170.1 });
 assert.strictEqual(c.fuel, 515);   // 20÷7×180.1 = 514.57… → 515
-assert.strictEqual(c.total, 520);  // 515 → 10円丸めで520
+assert.strictEqual(c.total, 515);  // 丸めなし（fuelと一致）
 
 // 1人乗車では割り勘表示なし
 c = calcSettlement({ ...base, km: 10, etc: 0, gas: 170, pax: 1 });
