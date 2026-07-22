@@ -513,9 +513,9 @@
 <div class="toast" id="toast"></div>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=234"></script>
-<script src="key.js?v=234"></script>
-<script src="calc.js?v=234"></script>
+<script src="data.js?v=235"></script>
+<script src="key.js?v=235"></script>
+<script src="calc.js?v=235"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -938,7 +938,7 @@
     }
     if (seq !== routeReqSeq) return;  // 古い応答は破棄（会場名と金額の食い違い防止）
     const km = Math.round(r.km * 10) / 10;
-    lastRoute = { name: place.name, lat: place.lat, lon: place.lon, km, toll: r.toll, ics: r.ics || [] };
+    lastRoute = { name: place.name, lat: place.lat, lon: place.lon, km, toll: r.toll, min: Math.round(r.min) || 0, ics: r.ics || [] };
     $("calcKm").value = km;
     $("calcEtc").value = r.toll;
     $("venueCands").innerHTML = "";
@@ -1071,10 +1071,15 @@
       const wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
       dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${wd}）`;
     }
-    // 高速区間は、NAVITIME取得時の会場・距離・料金から手入力で変更されていないときだけ載せる
+    // 所要時間・高速区間は、NAVITIME取得時の会場・距離・料金から手入力で変更されていないときだけ載せる
+    const routeUnchanged =
+      lastRoute && venueName === lastRoute.name && c.km === lastRoute.km && c.etc === lastRoute.toll;
+    const timeLine =
+      routeUnchanged && lastRoute.min > 0
+        ? `所要時間：約${lastRoute.min}分（片道・朝8時出発の予測）`
+        : null;
     const icLine =
-      c.etc > 0 && lastRoute && lastRoute.ics.length >= 2 &&
-      venueName === lastRoute.name && c.km === lastRoute.km && c.etc === lastRoute.toll
+      routeUnchanged && c.etc > 0 && lastRoute.ics.length >= 2
         ? `高速区間：${lastRoute.ics.join("→")}`
         : null;
     // 標準と違う出発地で計算した金額は、受け取る側が気づけるよう明記する
@@ -1085,6 +1090,7 @@
       `会場：${venueName}`,
       mpOv ? `出発地：${mpOv.name}（標準の集合場所とは異なります）` : null,
       `往復距離：${c.rtKm.toFixed(1)}km（片道${c.km.toFixed(1)}km）`,
+      timeLine,
       `高速代（ETC往復）：${yen(c.toll)}`,
       icLine,
       c.parking > 0 ? `駐車場代（実費）：${yen(c.parking)}` : null,
@@ -1267,7 +1273,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.34";
+  const APP_VERSION = "2.35";
   let lastGasApplied = null;
 
   function refresh() {
