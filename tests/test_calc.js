@@ -14,6 +14,23 @@ assert.strictEqual(c.toll, 2100);   // 1050×2
 assert.strictEqual(c.total, 3410);  // 3410はすでに10円単位
 assert.strictEqual(c.per, 1140);    // 3410÷3=1136.7 → 10円切り上げ
 
+// 駐車場代あり（実費をそのまま加算。往復2倍しない）
+c = calcSettlement({ ...base, km: 25, etc: 1050, gas: 173.4, pax: 3, parking: 500 });
+assert.strictEqual(c.parking, 500);
+assert.strictEqual(c.totalRaw, 3910); // 1310+2100+500
+assert.strictEqual(c.total, 3910);
+assert.strictEqual(c.per, 1310);      // 3910÷3=1303.3 → 10円切り上げ
+
+// 駐車場代の端数も10円丸めの対象（515+300=815 → 820）
+c = calcSettlement({ ...base, km: 10, etc: 0, gas: 170.1, parking: 300 });
+assert.strictEqual(c.totalRaw, 815);
+assert.strictEqual(c.total, 820);
+
+// 駐車場代 未入力・空欄は0扱い、負の値はnull
+c = calcSettlement({ ...base, km: 10, etc: 0, gas: 170, parking: "" });
+assert.strictEqual(c.parking, 0);
+assert.strictEqual(calcSettlement({ ...base, km: 10, gas: 170, parking: -100 }), null);
+
 // 高速なし・人数未入力（一人あたりは出さない）
 c = calcSettlement({ ...base, km: 10, etc: 0, gas: 170, pax: 0 });
 assert.strictEqual(c.fuel, 514);    // 20÷7×180 = 514.28…

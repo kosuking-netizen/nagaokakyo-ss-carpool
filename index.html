@@ -352,13 +352,21 @@
 
       <div class="row" style="margin-top:12px;">
         <div>
+          <label class="field">駐車場代（円・かかった実費）</label>
+          <input type="number" id="calcParking" step="10" min="0" inputmode="numeric" placeholder="なければ空欄でOK">
+        </div>
+        <div>
           <label class="field">ガソリン価格（円/L）</label>
           <input type="number" id="calcGas" step="0.1" min="0" inputmode="decimal">
         </div>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
         <div>
           <label class="field">割り勘人数（割る数）</label>
           <input type="number" id="calcPax" step="1" min="1" inputmode="numeric" placeholder="例：4">
         </div>
+        <div></div>
       </div>
 
       <div class="result" id="resultBox" style="display:none;">
@@ -366,6 +374,7 @@
           <tr><td>往復距離</td><td id="rKm"></td></tr>
           <tr><td>ガソリン代 <span style="font-size:11px;color:var(--gray);">＝往復距離÷7km/L×(単価+10円)</span></td><td id="rFuel"></td></tr>
           <tr><td>高速代（ETC往復）</td><td id="rToll"></td></tr>
+          <tr id="rParkingRow" style="display:none;"><td>駐車場代（実費）</td><td id="rParking"></td></tr>
           <tr class="total"><td>精算額</td><td id="rTotal"></td></tr>
           <tr class="per" id="rPerRow" style="display:none;"><td>一人あたり<span style="font-size:11px;color:var(--gray);">（10円切上げ）</span></td><td id="rPer"></td></tr>
         </table>
@@ -440,10 +449,11 @@
         <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」（毎週水曜夜に自動更新）</li>
         <li>ETC料金は<b>「試合の日付」の朝8時出発</b>として計算します（土日祝の<b>ETC休日割引を自動反映</b>。日付を変えるとルート・料金を取り直します）</li>
         <li>ガソリン単価は<b>計算した時点の最新週の価格</b>を使います（試合直後の精算を想定した割り切り仕様。週ごとの価格差は通常±1〜2円/Lで、精算額への影響は数十円未満）</li>
-        <li>丸め方：ガソリン代を1円単位に四捨五入 → 高速代と合計して10円単位に四捨五入 ／ 一人あたりは10円単位に切り上げ</li>
+        <li>駐車場代がかかった場合は<b>実費を手入力</b>（かかった金額をそのまま加算。往復2倍はしません）</li>
+        <li>丸め方：ガソリン代を1円単位に四捨五入 → 高速代・駐車場代と合計して10円単位に四捨五入 ／ 一人あたりは10円単位に切り上げ</li>
       </ul>
       <div class="info" style="margin-top:8px;">
-        計算式：<b>精算額 ＝ 往復距離 ÷ 7 ×（週次価格＋10円）＋ ETC片道×2</b><br>
+        計算式：<b>精算額 ＝ 往復距離 ÷ 7 ×（週次価格＋10円）＋ ETC片道×2 ＋ 駐車場代（実費）</b><br>
         一人あたり ＝ 精算額 ÷ 割り勘人数（10円単位切り上げ）
       </div>
     </div>
@@ -503,9 +513,9 @@
 <div class="toast" id="toast"></div>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=233"></script>
-<script src="key.js?v=233"></script>
-<script src="calc.js?v=233"></script>
+<script src="data.js?v=234"></script>
+<script src="key.js?v=234"></script>
+<script src="calc.js?v=234"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -985,6 +995,7 @@
     return window.NSS_CALC.calcSettlement({
       km: $("calcKm").value,
       etc: $("calcEtc").value,
+      parking: $("calcParking").value,
       gas: $("calcGas").value,
       pax: $("calcPax").value,
       fuelEfficiency: D.fuelEfficiency,
@@ -1005,6 +1016,7 @@
     if (c.gas < 120 || c.gas > 250) w.push("ガソリン価格が通常の範囲（120〜250円/L）を外れています。入力を確認してください。");
     if (c.km > 150) w.push("片道150kmを超えています。距離の入力を確認してください。");
     if (c.etc > 0 && c.etc / c.km > 60) w.push("距離のわりに高速代が高すぎるようです。入力を確認してください。");
+    if (c.parking > 3000) w.push("駐車場代が3,000円を超えています。入力を確認してください。");
     if (c.pax > 10) w.push("割り勘人数が10人を超えています。入力を確認してください。");
     const age = gasWeekAgeDays();
     if (age != null && age > 10 && !gasOverride()) {
@@ -1025,6 +1037,8 @@
     $("rKm").textContent = c.rtKm.toFixed(1) + " km";
     $("rFuel").textContent = yen(c.fuel);
     $("rToll").textContent = yen(c.toll);
+    $("rParkingRow").style.display = c.parking > 0 ? "" : "none";
+    $("rParking").textContent = yen(c.parking);
     $("rTotal").textContent = yen(c.total);
     if (c.per != null) {
       $("rPerRow").style.display = "";
@@ -1033,7 +1047,7 @@
       $("rPerRow").style.display = "none";
     }
     $("rNote").textContent =
-      `単価 ${c.gas.toFixed(1)}＋10＝${c.unit.toFixed(1)}円/L ／ 燃費7km/L ／ ガソリン代＋高速代＝${yen(c.totalRaw)} を10円単位に四捨五入`;
+      `単価 ${c.gas.toFixed(1)}＋10＝${c.unit.toFixed(1)}円/L ／ 燃費7km/L ／ ガソリン代＋高速代${c.parking > 0 ? "＋駐車場代" : ""}＝${yen(c.totalRaw)} を10円単位に四捨五入`;
     const warns = calcWarnings(c);
     const wBox = $("rWarn");
     if (warns.length) {
@@ -1073,6 +1087,7 @@
       `往復距離：${c.rtKm.toFixed(1)}km（片道${c.km.toFixed(1)}km）`,
       `高速代（ETC往復）：${yen(c.toll)}`,
       icLine,
+      c.parking > 0 ? `駐車場代（実費）：${yen(c.parking)}` : null,
       `ガソリン代：${yen(c.fuel)}（${c.gas.toFixed(1)}+10円/L・燃費7km/L）`,
       `精算額：${yen(c.total)}`,
       c.per != null ? `割り勘人数：${c.pax}人 → 一人あたり：${yen(c.per)}` : null,
@@ -1088,7 +1103,7 @@
     );
   });
 
-  ["calcKm", "calcEtc", "calcGas", "calcPax"].forEach((id) =>
+  ["calcKm", "calcEtc", "calcParking", "calcGas", "calcPax"].forEach((id) =>
     $(id).addEventListener("input", recalc)
   );
 
@@ -1252,7 +1267,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.33";
+  const APP_VERSION = "2.34";
   let lastGasApplied = null;
 
   function refresh() {
