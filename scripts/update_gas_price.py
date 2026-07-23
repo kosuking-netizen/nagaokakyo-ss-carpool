@@ -76,6 +76,11 @@ def update_data_js(price, week):
             % (old_price, price, abs(price - old_price), MAX_WEEKLY_JUMP)
         )
 
+    if "[AUTO-GAS-CHECKED]" not in src:
+        raise RuntimeError("data.js に [AUTO-GAS-CHECKED] マーカーが見つかりません")
+
+    jst_today = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d")
+
     new = re.sub(
         r"price: [\d.]+, // \[AUTO-GAS-PRICE\]",
         "price: %s, // [AUTO-GAS-PRICE]" % price,
@@ -86,21 +91,35 @@ def update_data_js(price, week):
         'week: "%s", // [AUTO-GAS-WEEK]' % week,
         new,
     )
+    price_changed = new != src
 
-    # 価格・週に実際の変更があるときだけ更新日を書き換えてコミットさせる
-    if new == src:
-        print("変更なし（価格 %s 円/L・%s の週のまま）" % (price, week))
-        return False
-
-    jst_today = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d")
+    # チェック実行日は価格に変更がなくても毎回記録する
+    # （画面の「最終自動チェック」表示で、処理がちゃんと回ったか確認できるように）
     new = re.sub(
-        r'dataUpdated: "[\d-]+", // \[AUTO-UPDATED\]',
-        'dataUpdated: "%s", // [AUTO-UPDATED]' % jst_today,
+        r'checked: "[\d-]+", // \[AUTO-GAS-CHECKED\]',
+        'checked: "%s", // [AUTO-GAS-CHECKED]' % jst_today,
         new,
     )
+
+    # dataUpdated は価格・週が実際に変わったときだけ動かす
+    if price_changed:
+        new = re.sub(
+            r'dataUpdated: "[\d-]+", // \[AUTO-UPDATED\]',
+            'dataUpdated: "%s", // [AUTO-UPDATED]' % jst_today,
+            new,
+        )
+
+    if new == src:
+        # 同じ日に再実行した場合のみここに来る
+        print("変更なし（価格 %s 円/L・%s の週・チェック日 %s 記録済み）" % (price, week, jst_today))
+        return False
+
     with open(DATA_JS, "w", encoding="utf-8", newline="\n") as f:
         f.write(new)
-    print("更新しました: %s 円/L（%s の週）" % (price, week))
+    if price_changed:
+        print("更新しました: %s 円/L（%s の週）" % (price, week))
+    else:
+        print("価格は変更なし（%s 円/L・%s の週のまま）。チェック実行日 %s を記録" % (price, week, jst_today))
     return True
 
 

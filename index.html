@@ -398,7 +398,8 @@
       </div>
       <div class="info" id="gasWeekInfo"></div>
       <div class="ok-box">
-        価格は<b>毎週水曜の夜に自動更新</b>されます（京都府平均・レギュラー）。手作業は不要です。
+        価格は<b>毎週水・木・金の夜に自動チェック</b>され、新しい週の価格が出ていれば更新されます（京都府平均・レギュラー）。手作業は不要です。
+        チェックが動いたかどうかは上の<b>「最終自動チェック」の日付</b>で確認できます（価格に変更がない日も記録されます）。
       </div>
       <div class="info" style="margin-top:10px;">
         参考：<a href="https://www.enecho.meti.go.jp/statistics/petroleum_and_lpgas/pl007/results.html" target="_blank" rel="noopener">資源エネルギー庁 石油製品価格調査</a>／<a href="https://oil-stat.com/reg/%E4%BA%AC%E9%83%BD%E5%BA%9C.html" target="_blank" rel="noopener">京都府の週次価格</a>
@@ -446,7 +447,7 @@
         <li>ルート・高速料金は<b>計算のたびにNAVITIMEから最新を取得</b>（道路や料金の変更に自動追従）</li>
         <li>距離・ETC料金は<b>往復分</b>（片道の2倍）</li>
         <li>燃費は <b>7km/L</b> で統一</li>
-        <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」（毎週水曜夜に自動更新）</li>
+        <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」（毎週水〜金の夜に自動チェック・更新）</li>
         <li>ETC料金は<b>「試合の日付」の朝8時出発</b>として計算します（土日祝の<b>ETC休日割引を自動反映</b>。日付を変えるとルート・料金を取り直します）</li>
         <li>ガソリン単価は<b>計算した時点の最新週の価格</b>を使います（試合直後の精算を想定した割り切り仕様。週ごとの価格差は通常±1〜2円/Lで、精算額への影響は数十円未満）</li>
         <li>駐車場代がかかった場合は<b>実費を手入力</b>（かかった金額をそのまま加算。往復2倍はしません）</li>
@@ -513,9 +514,9 @@
 <div class="toast" id="toast"></div>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=236"></script>
-<script src="key.js?v=236"></script>
-<script src="calc.js?v=236"></script>
+<script src="data.js?v=237"></script>
+<script src="key.js?v=237"></script>
+<script src="calc.js?v=237"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -1118,14 +1119,19 @@
     const ov = gasOverride();
     $("gasPriceDisplay").textContent = effectiveGasPrice().toFixed(1);
     const badge = $("gasBadge");
+    // 自動チェックが最後に走った日（価格に変更がなくても毎回記録される）。
+    // 古いdata.jsにはこのフィールドがないため、あるときだけ表示する
+    const checked = D.gasPrice.checked
+      ? ` ／ 最終自動チェック：${D.gasPrice.checked.replace(/^\d{4}-0?(\d+)-0?(\d+)$/, "$1/$2")}`
+      : "";
     if (ov) {
       badge.className = "badge badge-local";
       badge.textContent = "この端末で上書き中";
-      $("gasWeekInfo").textContent = `共有データの価格：${D.gasPrice.price.toFixed(1)}円/L（${D.gasPrice.week}の週）`;
+      $("gasWeekInfo").textContent = `共有データの価格：${D.gasPrice.price.toFixed(1)}円/L（${D.gasPrice.week}の週）` + checked;
     } else {
       badge.className = "badge badge-shared";
       badge.textContent = "自動更新";
-      $("gasWeekInfo").textContent = `${D.gasPrice.week}の週の京都府平均（レギュラー・現金）`;
+      $("gasWeekInfo").textContent = `${D.gasPrice.week}の週の京都府平均（レギュラー・現金）` + checked;
     }
   }
 
@@ -1273,7 +1279,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.36";
+  const APP_VERSION = "2.37";
   let lastGasApplied = null;
 
   function refresh() {

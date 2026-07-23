@@ -35,6 +35,9 @@ if (D) {
     ok(/^\d{4}-\d{2}-\d{2}$/.test(D.gasPrice.week), "gasPrice.week が YYYY-MM-DD 形式ではありません");
     const week = new Date(D.gasPrice.week + "T00:00:00Z");
     ok(week.getTime() <= Date.now() + 2 * 86400000, "gasPrice.week が未来の日付です: " + D.gasPrice.week);
+    ok(/^\d{4}-\d{2}-\d{2}$/.test(D.gasPrice.checked), "gasPrice.checked が YYYY-MM-DD 形式ではありません");
+    const chk = new Date(D.gasPrice.checked + "T00:00:00Z");
+    ok(chk.getTime() <= Date.now() + 2 * 86400000, "gasPrice.checked が未来の日付です: " + D.gasPrice.checked);
   }
 
   // 集合場所（長岡京周辺の座標か）
