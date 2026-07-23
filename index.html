@@ -352,7 +352,7 @@
 
       <div class="row" style="margin-top:12px;">
         <div>
-          <label class="field">駐車場代（円・かかった実費）</label>
+          <label class="field">駐車場代（円・実費）</label>
           <input type="number" id="calcParking" step="10" min="0" inputmode="numeric" placeholder="なければ空欄でOK">
         </div>
         <div>
@@ -450,7 +450,7 @@
         <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」（毎週水〜金の夜に自動チェック・更新）</li>
         <li>ETC料金は<b>「試合の日付」の朝8時出発</b>として計算します（土日祝の<b>ETC休日割引を自動反映</b>。日付を変えるとルート・料金を取り直します）</li>
         <li>ガソリン単価は<b>計算した時点の最新週の価格</b>を使います（試合直後の精算を想定した割り切り仕様。週ごとの価格差は通常±1〜2円/Lで、精算額への影響は数十円未満）</li>
-        <li>駐車場代がかかった場合は<b>実費を手入力</b>（かかった金額をそのまま加算。往復2倍はしません）</li>
+        <li>駐車場代は<b>実費を手入力</b>（金額をそのまま加算。往復2倍はしません）</li>
         <li>丸め方：ガソリン代のみ1円単位に四捨五入。精算額は内訳の合計そのまま（<b>10円丸めは廃止・PayPay精算対応</b>）／ 一人あたりは1円単位に切り上げ</li>
       </ul>
       <div class="info" style="margin-top:8px;">
@@ -514,9 +514,9 @@
 <div class="toast" id="toast"></div>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=237"></script>
-<script src="key.js?v=237"></script>
-<script src="calc.js?v=237"></script>
+<script src="data.js?v=238"></script>
+<script src="key.js?v=238"></script>
+<script src="calc.js?v=238"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -1279,7 +1279,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.37";
+  const APP_VERSION = "2.38";
   let lastGasApplied = null;
 
   function refresh() {
