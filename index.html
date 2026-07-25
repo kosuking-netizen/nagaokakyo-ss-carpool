@@ -495,6 +495,7 @@
         <li>本アプリは<b>長岡京SSの公式サービスではありません</b>。チームとは関係のない保護者有志が個人で無償運営する<b>非公式の精算補助ツール</b>です（内容についてチームへの問い合わせはご遠慮ください）</li>
         <li>金額は<b>以前使用していたチームルールに準じた自動計算</b>です。気になるときは「地図で距離を照合」リンクやLINEコピー文の計算根拠でご確認ください（距離・料金は手入力でも調整できます）</li>
         <li>外部サービス（NAVITIME等）の仕様変更・無料枠の制限により、予告なく自動取得が使えなくなることがあります（その場合も手入力で計算できます）</li>
+        <li>アプリの改善のため、匿名のアクセス解析（<a href="https://www.goatcounter.com/" target="_blank" rel="noopener">GoatCounter</a>）を利用しています。Cookieは使わず、<b>利用者個人を特定する情報は収集しません</b>（訪問数と機能の利用回数のみ）</li>
         <li>無償運営のため、利用にともなう不利益の補償はいたしかねます</li>
       </ul>
     </div>
@@ -513,10 +514,13 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- 匿名アクセス解析（GoatCounter・Cookie不使用・個人を特定する情報は収集しない） -->
+<script data-goatcounter="https://nagaokakyo-ss.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=238"></script>
-<script src="key.js?v=238"></script>
-<script src="calc.js?v=238"></script>
+<script src="data.js?v=239"></script>
+<script src="key.js?v=239"></script>
+<script src="calc.js?v=239"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -545,6 +549,16 @@
     t.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
+  }
+
+  // 匿名の利用状況カウント（GoatCounterイベント）。誰が使ったかは記録されない。
+  // 解析スクリプトがブロック・未読込でもアプリ本体の動作には影響させない
+  function track(name) {
+    try {
+      if (window.goatcounter && window.goatcounter.count) {
+        window.goatcounter.count({ path: name, title: name, event: true });
+      }
+    } catch {}
   }
 
   function escapeHtml(s) {
@@ -845,6 +859,7 @@
   async function searchVenues() {
     const q = $("venueQuery").value.trim();
     if (!q) { toast("会場名か住所を入力してください"); return; }
+    track("会場検索");
     const box = $("venueCands");
     $("routeStatus").innerHTML = "";  // 前の会場の取得結果表示を消す
 
@@ -932,6 +947,7 @@
       if (seq !== routeReqSeq) return;  // すでに別の会場がタップされている
       const msg = (e && e.message) ? e.message : String(e);
       console.warn("NAVITIME取得失敗:", msg);
+      track("ルート取得失敗");
       st.innerHTML =
         `⚠ NAVITIMEの取得に失敗しました（${escapeHtml(msg)}）。` +
         "再試行するか、距離・料金を手入力してください。";
@@ -944,6 +960,7 @@
     $("calcEtc").value = r.toll;
     $("venueCands").innerHTML = "";
     pushHistory(place);
+    track("ルート取得成功");
     const icChain =
       r.toll > 0 && r.ics && r.ics.length >= 2
         ? `<br>高速区間：${r.ics.map(escapeHtml).join(" → ")}`
@@ -1103,6 +1120,7 @@
   }
 
   $("copyBtn").addEventListener("click", () => {
+    track("LINEコピー");
     const text = buildCopyText();
     navigator.clipboard.writeText(text).then(
       () => toast("コピーしました。LINEに貼り付けてください"),
@@ -1138,6 +1156,7 @@
   $("gasSaveBtn").addEventListener("click", () => {
     const p = parseFloat($("gasOverrideInput").value);
     if (!(p > 0)) { toast("価格を入力してください"); return; }
+    track("ガソリン価格上書き");
     lsSet(LS_GAS, JSON.stringify({ price: p, savedAt: new Date().toISOString() }));
     $("gasOverrideInput").value = "";
     refresh();
@@ -1167,6 +1186,7 @@
   }
 
   function applyMeetingPoint(place) {
+    track("出発地変更");
     lsSet(LS_MP, JSON.stringify({ name: place.name, lat: place.lat, lon: place.lon }));
     $("mpCands").innerHTML = "";
     $("mpQuery").value = "";
@@ -1279,7 +1299,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.38";
+  const APP_VERSION = "2.39";
   let lastGasApplied = null;
 
   function refresh() {
