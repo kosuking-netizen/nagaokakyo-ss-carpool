@@ -464,16 +464,15 @@
       <div class="info">
         状態：<span class="badge" id="apiKeyBadge"></span><br>
         <b>通常は設定不要です</b>（チーム共有キーが内蔵されています）。
-        共有キーの無料枠は<b>会場検索・ルート取得それぞれ月500回</b>をチーム全員で共用します。枠のリセットは暦の月初ではなく<b>契約日基準（毎月18日ごろ）</b>です。使い切ると次のリセットまで自動取得が止まりますが、距離・料金の手入力で計算は可能です。<br>残り回数は<b>毎晩21:30に自動チェック</b>していて、下の「チーム全体」の数字はチーム全員に同じものが表示されます。
+        無料枠は<b>ルート取得・会場検索それぞれ月500回</b>をチーム全員で共用し、<b>毎月18日ごろ</b>にリセットされます。使い切ると自動取得は止まりますが、距離・料金を手入力すれば計算できます。
       </div>
       <div class="info" id="apiQuotaInfo" style="margin-top:8px;"></div>
       <div class="info" style="margin-top:8px;">
-        自分専用のキーを使いたい場合（枠を分けたい人向け）：RapidAPIで無料アカウント作成 →
+        自分専用のキーを使う場合（任意）：RapidAPIで無料アカウントを作り、
         <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-car" target="_blank" rel="noopener">NAVITIME Route(car)</a> と
         <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-spot" target="_blank" rel="noopener">NAVITIME Spot</a> の両方で
-        Pricing → Basic($0.00) を Subscribe（クレジットカード不要・自動課金なし）→ キーを下に貼り付け。
-        個人キーは<b>この端末の中だけ</b>に保存され、共有キーより優先されます。
-        （Spotを契約しなくても会場検索は別の無料検索で動きます）
+        Pricing → Basic($0.00) を Subscribe（カード不要）→ 下に貼り付け。
+        <b>この端末にだけ</b>保存され、共有キーより優先されます。
       </div>
       <label class="field">個人APIキー（X-RapidAPI-Key・任意）</label>
       <div class="row">
@@ -518,9 +517,9 @@
 <script data-goatcounter="https://nagaokakyo-ss.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=240"></script>
-<script src="key.js?v=240"></script>
-<script src="calc.js?v=240"></script>
+<script src="data.js?v=241"></script>
+<script src="key.js?v=241"></script>
+<script src="calc.js?v=241"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -616,58 +615,12 @@
     renderHistory();
   }
 
-  // ---------- API残り回数の記録・表示 ----------
-  // RapidAPIはレスポンスヘッダーで残り回数を返すので、取得のたびに読み取って保存し画面に表示する。
-  // 値はこの端末が最後に叩いた時点のスナップショット（他の人の消費は次に叩くまで反映されない）。
-  // 残数だけ問い合わせる無料の口がなく確認自体が1回消費になるため、定期取得はしない。
+  // ---------- API残り回数の表示 ----------
+  // 表示するのはチーム共有キーの残り回数だけ。data.js の値を毎晩21:30の自動チェックが
+  // 書き換えるので、誰の端末でも同じ数字が見える。
+  // 端末ごとの記録は「自分が最後に叩いた時点」しか映せず混乱のもとなので持たない。
   // リセットは暦月ではなく契約日基準（2026-07-18 Subscribe → 毎月18〜19日ごろ）。
-  const LS_QUOTA = "nss_apiQuota";
-  function quotaData() {
-    try { return JSON.parse(lsGet(LS_QUOTA)) || {}; } catch { return {}; }
-  }
-  function recordQuota(kind, resp) {
-    try {
-      const rem = parseInt(resp.headers.get("x-ratelimit-requests-remaining"), 10);
-      const lim = parseInt(resp.headers.get("x-ratelimit-requests-limit"), 10);
-      const reset = parseInt(resp.headers.get("x-ratelimit-requests-reset"), 10);
-      if (isNaN(rem) || isNaN(lim)) return;
-      const q = quotaData();
-      q[kind] = {
-        remaining: rem,
-        limit: lim,
-        resetAt: isNaN(reset) ? null : Date.now() + reset * 1000,
-        at: Date.now(),
-        personal: !!personalKey(),
-      };
-      lsSet(LS_QUOTA, JSON.stringify(q));
-      renderQuota();
-    } catch {}
-  }
-  // 記録した時刻を「M/D HH:MM」で表す（いつ時点の数字かを画面に出すため）
-  function quotaStamp(ts) {
-    const d = new Date(ts);
-    const p = (n) => String(n).padStart(2, "0");
-    return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-  }
-  function quotaLine(label, e) {
-    if (!e) return label + "：未取得";
-    const warn = e.remaining <= 50;
-    // 旧形式（resetDays）のデータは記録時刻から日付に換算する
-    let resetAt = e.resetAt;
-    if (resetAt == null && e.resetDays != null && e.at) resetAt = e.at + e.resetDays * 86400000;
-    let resetTxt = "";
-    if (resetAt != null) {
-      const d = new Date(resetAt);
-      resetTxt = `（${d.getMonth() + 1}/${d.getDate()}頃リセット）`;
-    }
-    // 古い記録をそのまま信じないよう、いつ取得した数字かを必ず添える
-    const atTxt = e.at
-      ? ` <span style="color:#6b7280;">［${quotaStamp(e.at)}時点］</span>`
-      : "";
-    return (
-      `${label}：<b${warn ? ' style="color:#b91c1c;"' : ""}>残り${e.remaining}回</b>／${e.limit}回` + resetTxt + atTxt
-    );
-  }
+
   // "2026-09-18" → "9/18"（画面用の短い表記）
   function mdOf(ymd) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || "");
@@ -677,80 +630,54 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd || "")) return null;
     return Math.floor((Date.now() - new Date(ymd + "T00:00:00").getTime()) / 86400000);
   }
-
-  // チーム全体の残り回数（data.jsの記録＝毎晩21:30の自動チェック）。
-  // 端末ごとの記録と違い、誰がどの端末で使っても同じ数字が全員に見える。
-  // ルート取得・会場検索は別枠なので、それぞれ1回ずつ確認して同じ形式で表示する。
-  function teamQuotaLine(label, t) {
-    if (!t || typeof t.remaining !== "number" || typeof t.limit !== "number") {
-      return `${label}：未取得`;
-    }
-    const warn = t.remaining <= 50;
-    const resetTxt = t.resetOn ? `（${mdOf(t.resetOn)}頃リセット）` : "";
-    const used = t.lastUsed ? `最終利用 ${mdOf(t.lastUsed)}ごろ` : "この期間の利用なし";
-    // 自動チェックが止まると数字が凍りつくので、そのときは黙って古い値を見せない
-    const age = daysSince(t.checked);
-    const stale =
-      age != null && age > 3
-        ? ` <span style="color:#b91c1c;">⚠ 自動チェックが${age}日止まっています</span>`
-        : ` <span style="color:#6b7280;">［${mdOf(t.checked)} 確認］</span>`;
-    return (
-      `${label}：<b${warn ? ' style="color:#b91c1c;"' : ""}>残り${t.remaining}回</b>／${t.limit}回${resetTxt}` +
-      ` <span style="color:#6b7280;">${used}</span>${stale}`
-    );
-  }
   function teamQuota() {
     const q = (D && D.apiQuota) || null;
     return q && q.route && q.spot ? q : null;
   }
+  function quotaLine(label, t) {
+    const warn = t.remaining <= 50;
+    const used = t.lastUsed ? `最終利用 ${mdOf(t.lastUsed)}` : "利用なし";
+    return (
+      `${label}：<b${warn ? ' style="color:#b91c1c;"' : ""}>残り${t.remaining}回</b>／${t.limit}回` +
+      ` <span style="color:#6b7280;">${used}</span>`
+    );
+  }
 
   function renderQuota() {
-    const q = quotaData();
     const t = teamQuota();
     const box = $("apiQuotaInfo");
-    const personal = !!personalKey();
-
-    const team = t
-      ? "<b>チーム全体（共有キー・毎晩21:30に自動チェック）</b><br>" +
-        teamQuotaLine("ルート取得", t.route) + "<br>" +
-        teamQuotaLine("会場検索", t.spot) +
-        '<hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">'
-      : "";
-
-    const deviceBody =
-      !q.route && !q.spot
-        ? '<span style="color:#6b7280;">まだ不明（一度取得すると表示されます）</span>'
-        : quotaLine("ルート取得", q.route) + "<br>" + quotaLine("会場検索", q.spot);
-    const note = personal
-      ? "個人キーを使っているため、上のチーム全体の数字は井沢さんの消費とは別枠です。"
-      : "この端末で最後に使った時点の値です。上のチーム全体の数字のほうが新しいことがあります。";
-
-    box.innerHTML =
-      team +
-      `<b>この端末の記録${personal ? "（個人キー）" : ""}</b><br>` + deviceBody +
-      `<br><span style="color:#6b7280;">${note}</span>`;
-
-    // 計算画面のミニ表示は、全員で同じ数字が見えるチーム全体の値を優先する
     const mini = $("quotaMini");
-    if (!personal && t) {
-      const low = Math.min(t.route.remaining, t.spot.remaining);
-      // 2つのチェック日がずれることがあるので、古いほう＝より確かでない側に合わせて表示する
-      const oldest = t.route.checked < t.spot.checked ? t.route.checked : t.spot.checked;
-      const txt =
-        `ルート取得 残り${t.route.remaining}回／会場検索 残り${t.spot.remaining}回` +
-        `（${mdOf(oldest)}時点・チーム全体）`;
-      mini.innerHTML = low <= 50 ? `<span style="color:#b91c1c;">⚠ ${txt}</span>` : txt;
-    } else if (q.route || q.spot) {
-      const e = q.route || q.spot;
-      const warn = e.remaining <= 50;
-      const label = q.route ? "ルート取得" : "会場検索";
-      const stamp = e.at ? `（${quotaStamp(e.at)}時点）` : "";
-      mini.innerHTML = warn
-        ? `<span style="color:#b91c1c;">⚠ ${label} 残り${e.remaining}回${stamp}</span>`
-        : `${label} 残り${e.remaining}回${stamp}`;
-    } else {
+
+    if (!t) {
+      box.innerHTML = '<span style="color:#6b7280;">残り回数は未取得です。</span>';
       mini.innerHTML = "";
+      return;
     }
+
+    // 2つのチェック日がずれることがあるので、古いほう＝より確かでない側に合わせる
+    const oldest = t.route.checked < t.spot.checked ? t.route.checked : t.spot.checked;
+    const age = daysSince(oldest);
+    // 自動チェックが止まると数字が凍りつくので、そのときは黙って古い値を見せない
+    const stale = age != null && age > 3;
+    const foot = stale
+      ? `<span style="color:#b91c1c;">⚠ 自動チェックが${age}日止まっています（${mdOf(oldest)}が最後）</span>`
+      : `<span style="color:#6b7280;">${mdOf(oldest)} 確認・${mdOf(t.route.resetOn)}頃リセット</span>`;
+
+    // 個人キー使用中の人にはこの数字は自分の消費ではないと断っておく
+    const mine = personalKey()
+      ? '<br><span style="color:#6b7280;">※ 個人キー使用中のため、あなたの消費とは別枠です</span>'
+      : "";
+    box.innerHTML =
+      quotaLine("ルート取得", t.route) + "<br>" +
+      quotaLine("会場検索", t.spot) + "<br>" + foot + mine;
+
+    // 計算画面のミニ表示は数字だけ。少ないときと止まっているときだけ赤で知らせる
+    const low = Math.min(t.route.remaining, t.spot.remaining) <= 50;
+    const txt = `ルート取得 残り${t.route.remaining}回／会場検索 残り${t.spot.remaining}回`;
+    mini.innerHTML =
+      low || stale
+        ? `<span style="color:#b91c1c;">⚠ ${txt}（${mdOf(oldest)}時点）</span>`
+        : txt;
   }
 
   // ---------- 会場検索（NAVITIMEスポット検索 + GSI + OpenStreetMap Nominatim） ----------
@@ -769,7 +696,6 @@
         },
       }
     );
-    recordQuota("spot", r);
     if (!r.ok) throw new Error("navitime spot http " + r.status);
     const j = await r.json();
     return (j.items || []).map((x) => ({
@@ -873,7 +799,6 @@
     if ((r.status === 400 || r.status === 422) && st)
       r = await fetchTimeout(base + "&condition=toll_time", { headers });
     if (r.status === 400 || r.status === 422) r = await fetchTimeout(base, { headers });
-    recordQuota("route", r);
     if (!r.ok) {
       const reasons = {
         401: "APIキーが正しくありません。設定タブでキーを確認してください",
@@ -1373,7 +1298,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.40";
+  const APP_VERSION = "2.41";
   let lastGasApplied = null;
 
   function refresh() {
