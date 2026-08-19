@@ -30,6 +30,6 @@ window.APP_DATA = {
   gasPrice: {
     price: 172.6, // [AUTO-GAS-PRICE]
     week: "2026-08-10", // [AUTO-GAS-WEEK]
-    checked: "2026-08-14", // [AUTO-GAS-CHECKED] 自動チェックが最後に走った日（変更がなくても記録）
+    checked: "2026-08-19", // [AUTO-GAS-CHECKED] 自動チェックが最後に走った日（変更がなくても記録）
   },
 };
