@@ -1,29 +1,29 @@
-name: ガソリン価格 自動更新
+name: API残り回数 自動チェック
 
 on:
   schedule:
-    # 水・木・金曜 21:30 JST（= 12:30 UTC）。週次調査は通常水曜公表だが、
-    # 月曜祝日の週は木曜公表にずれるため複数回実行する（変更がなければ何もしない）
-    - cron: "30 12 * * 3-5"
+    # 毎晩 21:30 JST（= 12:30 UTC）。1回の実行でルート取得・会場検索を1回ずつ消費する。
+    # チェックはそのAPI自身の枠から引くので、負担は各枠6%（月約30回）ずつで偏らない。
+    - cron: "30 12 * * *"
   workflow_dispatch: {}
 
 permissions:
   contents: write
   pages: write
 
-# 残り回数チェックのジョブと同時刻に走るためpushが衝突する。直列化して待たせる
+# ガソリン価格ジョブと同時刻に走るとpushが衝突するため、直列化して待たせる
 concurrency:
   group: data-js-write
   cancel-in-progress: false
 
 jobs:
-  update:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: 価格を取得して data.js を更新
-        run: python3 scripts/update_gas_price.py
+      - name: 残り回数を取得して data.js を更新
+        run: python3 scripts/check_api_quota.py
 
       - name: 更新後の data.js を検証
         run: node scripts/validate_data.js
@@ -32,11 +32,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "gas-price-bot"
+          git config user.name "api-quota-bot"
           git config user.email "actions@users.noreply.github.com"
           if ! git diff --quiet data.js; then
             git add data.js
-            git commit -m "ガソリン価格を自動更新"
+            git commit -m "API残り回数を自動記録"
             # 別ジョブが先にpushしている場合に備えてrebaseしてから送る
             git pull --rebase --autostash
             git push
