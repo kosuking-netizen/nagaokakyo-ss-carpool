@@ -43,7 +43,7 @@ window.APP_DATA = {
   // resetOn は暦月ではなく契約日基準。lastUsed は自動チェック自身の1回を除いた最終利用日。
   apiQuota: {
     route: {
-      remaining: 499, // [AUTO-QUOTA-ROUTE-REMAINING]
+      remaining: 498, // [AUTO-QUOTA-ROUTE-REMAINING]
       limit: 500, // [AUTO-QUOTA-ROUTE-LIMIT]
       resetOn: "2026-09-18", // [AUTO-QUOTA-ROUTE-RESET]
       checked: "2026-08-20", // [AUTO-QUOTA-ROUTE-CHECKED]
