@@ -517,9 +517,9 @@
 <script data-goatcounter="https://nagaokakyo-ss.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=241"></script>
-<script src="key.js?v=241"></script>
-<script src="calc.js?v=241"></script>
+<script src="data.js?v=242"></script>
+<script src="key.js?v=242"></script>
+<script src="calc.js?v=242"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -636,11 +636,7 @@
   }
   function quotaLine(label, t) {
     const warn = t.remaining <= 50;
-    const used = t.lastUsed ? `最終利用 ${mdOf(t.lastUsed)}` : "利用なし";
-    return (
-      `${label}：<b${warn ? ' style="color:#b91c1c;"' : ""}>残り${t.remaining}回</b>／${t.limit}回` +
-      ` <span style="color:#6b7280;">${used}</span>`
-    );
+    return `${label}：<b${warn ? ' style="color:#b91c1c;"' : ""}>残り${t.remaining}回</b>／${t.limit}回`;
   }
 
   function renderQuota() {
@@ -1298,7 +1294,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.41";
+  const APP_VERSION = "2.42";
   let lastGasApplied = null;
 
   function refresh() {

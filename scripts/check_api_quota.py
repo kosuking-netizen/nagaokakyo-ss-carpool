@@ -118,12 +118,9 @@ def update_data_js(kind, api, remaining, limit, reset_on):
     with open(DATA_JS, encoding="utf-8") as f:
         src = f.read()
 
-    prev_remaining = int(marker(
-        src, r"remaining: (\d+), // \[AUTO-QUOTA-%s-REMAINING\]" % kind,
-        "[AUTO-QUOTA-%s-REMAINING]" % kind))
-    prev_last_used = marker(
-        src, r'lastUsed: "([^"]*)", // \[AUTO-QUOTA-%s-LASTUSED\]' % kind,
-        "[AUTO-QUOTA-%s-LASTUSED]" % kind)
+    # 書き換え前に4つのマーカーが揃っていることを確かめる（1つでも欠けたら中断）
+    marker(src, r"remaining: (\d+), // \[AUTO-QUOTA-%s-REMAINING\]" % kind,
+           "[AUTO-QUOTA-%s-REMAINING]" % kind)
     marker(src, r"limit: (\d+), // \[AUTO-QUOTA-%s-LIMIT\]" % kind,
            "[AUTO-QUOTA-%s-LIMIT]" % kind)
     marker(src, r'resetOn: "([^"]*)", // \[AUTO-QUOTA-%s-RESET\]' % kind,
@@ -131,16 +128,7 @@ def update_data_js(kind, api, remaining, limit, reset_on):
     marker(src, r'checked: "([^"]*)", // \[AUTO-QUOTA-%s-CHECKED\]' % kind,
            "[AUTO-QUOTA-%s-CHECKED]" % kind)
 
-    # 前回チェックからの消費回数。今回のチェック自身の1回は差し引く。
-    # 残数が増えていたらサイクルがリセットされているので、上限からの差で数え直す。
-    if remaining > prev_remaining:
-        used = limit - remaining - 1
-    else:
-        used = prev_remaining - remaining - 1
-    used = max(used, 0)
-
     today = datetime.now(JST).strftime("%Y-%m-%d")
-    last_used = today if used > 0 else prev_last_used
 
     new = re.sub(r"remaining: \d+, // \[AUTO-QUOTA-%s-REMAINING\]" % kind,
                  "remaining: %d, // [AUTO-QUOTA-%s-REMAINING]" % (remaining, kind), src)
@@ -151,14 +139,8 @@ def update_data_js(kind, api, remaining, limit, reset_on):
                      'resetOn: "%s", // [AUTO-QUOTA-%s-RESET]' % (reset_on, kind), new)
     new = re.sub(r'checked: "[^"]*", // \[AUTO-QUOTA-%s-CHECKED\]' % kind,
                  'checked: "%s", // [AUTO-QUOTA-%s-CHECKED]' % (today, kind), new)
-    new = re.sub(r'lastUsed: "[^"]*", // \[AUTO-QUOTA-%s-LASTUSED\]' % kind,
-                 'lastUsed: "%s", // [AUTO-QUOTA-%s-LASTUSED]' % (last_used, kind), new)
 
-    if used > 0:
-        print("  %s: 残り%d回／%d回・前回チェックから%d回使用（最終利用日 %s）"
-              % (api["label"], remaining, limit, used, last_used))
-    else:
-        print("  %s: 残り%d回／%d回・前回チェックから利用なし" % (api["label"], remaining, limit))
+    print("  %s: 残り%d回／%d回" % (api["label"], remaining, limit))
 
     if new == src:
         return False

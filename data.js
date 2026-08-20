@@ -40,21 +40,19 @@ window.APP_DATA = {
   // チーム共有キーのAPI残り回数（毎晩21:30に自動チェック）
   // ルート取得(Route car)と会場検索(Spot)は別枠なので、それぞれ1回ずつ確認する。
   // チェックはその API 自身の枠から引くので、負担は各枠6%（月約30回）ずつ。
-  // resetOn は暦月ではなく契約日基準。lastUsed は自動チェック自身の1回を除いた最終利用日。
+  // resetOn は暦月ではなく契約日基準（毎月18日ごろ）。
   apiQuota: {
     route: {
       remaining: 498, // [AUTO-QUOTA-ROUTE-REMAINING]
       limit: 500, // [AUTO-QUOTA-ROUTE-LIMIT]
       resetOn: "2026-09-18", // [AUTO-QUOTA-ROUTE-RESET]
       checked: "2026-08-20", // [AUTO-QUOTA-ROUTE-CHECKED]
-      lastUsed: "", // [AUTO-QUOTA-ROUTE-LASTUSED]
     },
     spot: {
       remaining: 498, // [AUTO-QUOTA-SPOT-REMAINING]
       limit: 500, // [AUTO-QUOTA-SPOT-LIMIT]
       resetOn: "2026-09-18", // [AUTO-QUOTA-SPOT-RESET]
       checked: "2026-08-20", // [AUTO-QUOTA-SPOT-CHECKED]
-      lastUsed: "", // [AUTO-QUOTA-SPOT-LASTUSED]
     },
   },
 };

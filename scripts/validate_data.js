@@ -55,9 +55,6 @@ if (D) {
     }
     ok(/^\d{4}-\d{2}-\d{2}$/.test(q.checked), at + ".checked が YYYY-MM-DD 形式ではありません");
     ok(/^\d{4}-\d{2}-\d{2}$/.test(q.resetOn), at + ".resetOn が YYYY-MM-DD 形式ではありません");
-    // lastUsed は「まだ誰も使っていない」を表す空文字を許容する
-    ok(q.lastUsed === "" || /^\d{4}-\d{2}-\d{2}$/.test(q.lastUsed),
-      at + ".lastUsed が YYYY-MM-DD 形式でも空でもありません: " + q.lastUsed);
   });
 
   // 集合場所（長岡京周辺の座標か）
