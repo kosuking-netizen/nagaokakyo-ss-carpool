@@ -34,7 +34,7 @@ window.APP_DATA = {
   gasPrice: {
     price: 172.6, // [AUTO-GAS-PRICE]
     week: "2026-08-17", // [AUTO-GAS-WEEK]
-    checked: "2026-08-21", // [AUTO-GAS-CHECKED] 自動チェックが最後に走った日（変更がなくても記録）
+    checked: "2026-08-26", // [AUTO-GAS-CHECKED] 自動チェックが最後に走った日（変更がなくても記録）
   },
 
   // チーム共有キーのAPI残り回数（毎晩21:30に自動チェック）
