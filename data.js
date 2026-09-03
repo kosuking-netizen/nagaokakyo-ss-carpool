@@ -17,7 +17,7 @@
 //    最新のルート・料金を取得する方式です（このファイルに会場情報は持ちません）。
 // ============================================================
 window.APP_DATA = {
-  dataUpdated: "2026-08-28", // [AUTO-UPDATED]
+  dataUpdated: "2026-09-04", // [AUTO-UPDATED]
 
   // 集合場所（この学年の集合場所）
   meetingPoint: {
@@ -32,9 +32,9 @@ window.APP_DATA = {
 
   // 今週のガソリン価格（京都府平均・レギュラー）※毎週水・木・金の夜に自動チェック
   gasPrice: {
-    price: 172.6, // [AUTO-GAS-PRICE]
-    week: "2026-08-24", // [AUTO-GAS-WEEK]
-    checked: "2026-09-03", // [AUTO-GAS-CHECKED] 自動チェックが最後に走った日（変更がなくても記録）
+    price: 172.5, // [AUTO-GAS-PRICE]
+    week: "2026-08-31", // [AUTO-GAS-WEEK]
+    checked: "2026-09-04", // [AUTO-GAS-CHECKED] 自動チェックが最後に走った日（変更がなくても記録）
   },
 
   // チーム共有キーのAPI残り回数（毎晩21:30に自動チェック）
