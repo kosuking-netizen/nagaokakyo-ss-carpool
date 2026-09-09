@@ -1,0 +1,26 @@
+name: 疎通診断（一時）
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 候補サイトへの疎通を確認
+        run: |
+          for u in \
+            "https://oil-stat.com/reg/%E4%BA%AC%E9%83%BD%E5%BA%9C.html" \
+            "https://oil-stat.com/" \
+            "https://www.enecho.meti.go.jp/statistics/petroleum_and_lpgas/pl007/results.html" \
+            "https://gogo.gs/ranking/26/" \
+            "https://www.e-stat.go.jp/"
+          do
+            echo "=== $u"
+            curl -s -o /dev/null --max-time 25 \
+              -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36" \
+              -w "  http=%{http_code} time=%{time_total}s size=%{size_download} ip=%{remote_ip}\n" \
+              "$u" || echo "  FAILED (exit $?)"
+          done
+          echo "=== DNS"
+          getent hosts oil-stat.com || echo "  DNS引けず"
