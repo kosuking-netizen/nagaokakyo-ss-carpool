@@ -7,20 +7,63 @@ jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
-      - name: 候補サイトへの疎通を確認
+      - name: curl と python の違いを切り分ける
         run: |
-          for u in \
-            "https://oil-stat.com/reg/%E4%BA%AC%E9%83%BD%E5%BA%9C.html" \
-            "https://oil-stat.com/" \
-            "https://www.enecho.meti.go.jp/statistics/petroleum_and_lpgas/pl007/results.html" \
-            "https://gogo.gs/ranking/26/" \
-            "https://www.e-stat.go.jp/"
-          do
-            echo "=== $u"
-            curl -s -o /dev/null --max-time 25 \
-              -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36" \
-              -w "  http=%{http_code} time=%{time_total}s size=%{size_download} ip=%{remote_ip}\n" \
-              "$u" || echo "  FAILED (exit $?)"
-          done
-          echo "=== DNS"
-          getent hosts oil-stat.com || echo "  DNS引けず"
+          U="https://oil-stat.com/reg/%E4%BA%AC%E9%83%BD%E5%BA%9C.html"
+          BOT="Mozilla/5.0 (gas-price-bot; nagaokakyo-ss-carpool)"
+          CHROME="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+
+          echo "=== A. curl / botのUA"
+          curl -s -o /dev/null --max-time 25 -A "$BOT" \
+            -w "  http=%{http_code} time=%{time_total}s size=%{size_download}\n" "$U" || echo "  FAILED"
+
+          echo "=== B. curl / ChromeのUA"
+          curl -s -o /dev/null --max-time 25 -A "$CHROME" \
+            -w "  http=%{http_code} time=%{time_total}s size=%{size_download}\n" "$U" || echo "  FAILED"
+
+          echo "=== C. curl / IPv4強制"
+          curl -s -4 -o /dev/null --max-time 25 -A "$BOT" \
+            -w "  http=%{http_code} time=%{time_total}s\n" "$U" || echo "  FAILED"
+
+          echo "=== D. 名前解決の結果（IPv6が混ざるか）"
+          python3 -c "
+          import socket
+          for r in socket.getaddrinfo('oil-stat.com', 443, type=socket.SOCK_STREAM):
+              print('  ', 'IPv6' if r[0]==socket.AF_INET6 else 'IPv4', r[4][0])
+          "
+
+          echo "=== E. python urllib / botのUA"
+          python3 -c "
+          import time, urllib.request
+          t=time.time()
+          req=urllib.request.Request('$U', headers={'User-Agent':'$BOT'})
+          try:
+              n=len(urllib.request.urlopen(req, timeout=25).read())
+              print('  OK size=%d time=%.1fs' % (n, time.time()-t))
+          except Exception as e:
+              print('  FAILED %r time=%.1fs' % (e, time.time()-t))
+          "
+
+          echo "=== F. python urllib / ChromeのUA"
+          python3 -c "
+          import time, urllib.request
+          t=time.time()
+          req=urllib.request.Request('$U', headers={'User-Agent':'$CHROME'})
+          try:
+              n=len(urllib.request.urlopen(req, timeout=25).read())
+              print('  OK size=%d time=%.1fs' % (n, time.time()-t))
+          except Exception as e:
+              print('  FAILED %r time=%.1fs' % (e, time.time()-t))
+          "
+
+          echo "=== G. python / TCP接続だけ試す（IPv4直指定）"
+          python3 -c "
+          import socket, time
+          for ip in ['183.90.245.40']:
+              t=time.time()
+              try:
+                  s=socket.create_connection((ip,443), timeout=15); s.close()
+                  print('  %s connect OK %.1fs' % (ip, time.time()-t))
+              except Exception as e:
+                  print('  %s FAILED %r %.1fs' % (ip, e, time.time()-t))
+          "
