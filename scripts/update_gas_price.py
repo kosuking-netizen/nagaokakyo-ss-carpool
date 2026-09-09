@@ -8,6 +8,7 @@
 import io
 import re
 import sys
+import time
 import urllib.request
 from datetime import datetime, timedelta, timezone, date
 
@@ -18,15 +19,36 @@ DATA_JS = "data.js"
 MAX_WEEKLY_JUMP = 15.0   # 前回価格からの変動がこれ（円/L）を超えたら異常として停止
 MAX_WEEK_AGE_DAYS = 21   # 調査週がこれより古いデータしか取れなければ異常として停止
 
+# 取得元への接続が一時的に詰まることがあるためリトライする（1回の失敗で通知が飛ばないように）
+FETCH_ATTEMPTS = 3
+FETCH_TIMEOUT = 30       # 秒（1試行あたり）
+RETRY_WAIT = 30          # 秒（試行間の待ち時間）
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 
-def fetch_price():
+def fetch_html():
+    """取得元のHTMLを取る。通信エラーは時間をおいて数回まで試す。"""
     req = urllib.request.Request(
         URL,
         headers={"User-Agent": "Mozilla/5.0 (gas-price-bot; nagaokakyo-ss-carpool)"},
     )
-    html = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "ignore")
+    for attempt in range(1, FETCH_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as res:
+                return res.read().decode("utf-8", "ignore")
+        except Exception as e:
+            if attempt == FETCH_ATTEMPTS:
+                raise RuntimeError(
+                    "取得元に%d回接続できませんでした（最後のエラー: %s）" % (FETCH_ATTEMPTS, e)
+                )
+            print("取得に失敗（%d回目 / %s）。%d秒待って再試行します" % (attempt, e, RETRY_WAIT))
+            sys.stdout.flush()
+            time.sleep(RETRY_WAIT)
+
+
+def fetch_price():
+    html = fetch_html()
 
     # 「173.4 円（2026年07月13日）」形式をすべて拾い、最も新しい日付のものを採用
     # （ページ内には過去の最高値・最安値も同形式で載っているため）
