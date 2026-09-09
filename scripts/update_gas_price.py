@@ -19,12 +19,16 @@ DATA_JS = "data.js"
 MAX_WEEKLY_JUMP = 15.0   # 前回価格からの変動がこれ（円/L）を超えたら異常として停止
 MAX_WEEK_AGE_DAYS = 21   # 調査週がこれより古いデータしか取れなければ異常として停止
 
-# 取得元への接続が一時的に詰まることがあるためリトライする（1回の失敗で通知が飛ばないように）
-FETCH_ATTEMPTS = 3
+# 取得元は数十分単位で不通になることがあるためリトライする（1回の詰まりで止めない）
+FETCH_ATTEMPTS = 4
 FETCH_TIMEOUT = 30       # 秒（1試行あたり）
-RETRY_WAIT = 30          # 秒（試行間の待ち時間）
+RETRY_WAIT = 90          # 秒（試行間の待ち時間）
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+
+
+class FetchError(Exception):
+    """取得元に繋がらなかった（ページ構造の異常とは区別する）。"""
 
 
 def fetch_html():
@@ -39,7 +43,7 @@ def fetch_html():
                 return res.read().decode("utf-8", "ignore")
         except Exception as e:
             if attempt == FETCH_ATTEMPTS:
-                raise RuntimeError(
+                raise FetchError(
                     "取得元に%d回接続できませんでした（最後のエラー: %s）" % (FETCH_ATTEMPTS, e)
                 )
             print("取得に失敗（%d回目 / %s）。%d秒待って再試行します" % (attempt, e, RETRY_WAIT))
@@ -145,6 +149,25 @@ def update_data_js(price, week):
     return True
 
 
+def recorded_week():
+    """data.js に記録済みの調査週を返す。"""
+    with open(DATA_JS, encoding="utf-8") as f:
+        m = re.search(r'week: "(\d{4})-(\d{2})-(\d{2})", // \[AUTO-GAS-WEEK\]', f.read())
+    if not m:
+        raise RuntimeError("data.js に [AUTO-GAS-WEEK] マーカーが見つかりません")
+    return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+
+
 if __name__ == "__main__":
-    p, w = fetch_price()
+    try:
+        p, w = fetch_price()
+    except FetchError as e:
+        # 取得元が一時的に落ちているだけなら、次回の実行（週3回走る）で拾えばよい。
+        # ただし記録済みの週まで古くなっていたら本当に困るので、そのときは失敗させる。
+        age = (date.today() - recorded_week()).days
+        if age > MAX_WEEK_AGE_DAYS:
+            print("%s\n記録済みの週も%d日前と古く、更新が止まっています" % (e, age))
+            raise
+        print("%s\n記録済みの週は%d日前とまだ新しいため、今回の更新は見送ります" % (e, age))
+        sys.exit(0)
     update_data_js(p, w)
