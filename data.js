@@ -46,13 +46,13 @@ window.APP_DATA = {
       remaining: 363, // [AUTO-QUOTA-ROUTE-REMAINING]
       limit: 500, // [AUTO-QUOTA-ROUTE-LIMIT]
       resetOn: "2026-09-18", // [AUTO-QUOTA-ROUTE-RESET]
-      checked: "2026-09-14", // [AUTO-QUOTA-ROUTE-CHECKED]
+      checked: "2026-09-15", // [AUTO-QUOTA-ROUTE-CHECKED]
     },
     spot: {
       remaining: 368, // [AUTO-QUOTA-SPOT-REMAINING]
       limit: 500, // [AUTO-QUOTA-SPOT-LIMIT]
       resetOn: "2026-09-18", // [AUTO-QUOTA-SPOT-RESET]
-      checked: "2026-09-14", // [AUTO-QUOTA-SPOT-CHECKED]
+      checked: "2026-09-15", // [AUTO-QUOTA-SPOT-CHECKED]
     },
   },
 };
