@@ -43,16 +43,16 @@ window.APP_DATA = {
   // resetOn は暦月ではなく契約日基準（毎月18日ごろ）。
   apiQuota: {
     route: {
-      remaining: 358, // [AUTO-QUOTA-ROUTE-REMAINING]
+      remaining: 499, // [AUTO-QUOTA-ROUTE-REMAINING]
       limit: 500, // [AUTO-QUOTA-ROUTE-LIMIT]
-      resetOn: "2026-09-18", // [AUTO-QUOTA-ROUTE-RESET]
-      checked: "2026-09-18", // [AUTO-QUOTA-ROUTE-CHECKED]
+      resetOn: "2026-10-18", // [AUTO-QUOTA-ROUTE-RESET]
+      checked: "2026-09-19", // [AUTO-QUOTA-ROUTE-CHECKED]
     },
     spot: {
-      remaining: 366, // [AUTO-QUOTA-SPOT-REMAINING]
+      remaining: 499, // [AUTO-QUOTA-SPOT-REMAINING]
       limit: 500, // [AUTO-QUOTA-SPOT-LIMIT]
-      resetOn: "2026-09-18", // [AUTO-QUOTA-SPOT-RESET]
-      checked: "2026-09-18", // [AUTO-QUOTA-SPOT-CHECKED]
+      resetOn: "2026-10-18", // [AUTO-QUOTA-SPOT-RESET]
+      checked: "2026-09-19", // [AUTO-QUOTA-SPOT-CHECKED]
     },
   },
 };
