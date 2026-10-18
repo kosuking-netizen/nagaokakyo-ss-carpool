@@ -537,9 +537,9 @@
 <script data-goatcounter="https://nagaokakyo-ss.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=245"></script>
-<script src="key.js?v=245"></script>
-<script src="calc.js?v=245"></script>
+<script src="data.js?v=246"></script>
+<script src="key.js?v=246"></script>
+<script src="calc.js?v=246"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -556,6 +556,8 @@
   const LS_HISTORY = "nss_venueHistory";
   const LS_MP = "nss_meetingPointOverride";
   const LS_FUEL = "nss_fuelEfficiencyOverride";
+  const LS_SEEN = "nss_deviceCounted";
+  const LS_SEEN_MONTH = "nss_deviceCountedMonth";
   const HISTORY_MAX = 8;
 
   // ---------- utilities ----------
@@ -579,6 +581,27 @@
         window.goatcounter.count({ path: name, title: name, event: true });
       }
     } catch {}
+  }
+
+  // 利用端末数の把握：端末ごとに「初めて開いた」を1回だけ、「今月使った」を月1回だけ送る。
+  // 送るのは回数だけで、端末には送信済みの目印（日付）しか残さない。
+  // count.jsは非同期で読み込まれるため、準備できるまで少し待ってから送る
+  function trackDevice() {
+    const d = new Date();
+    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;  // 日本時間の月
+    const pending = [];
+    if (!lsGet(LS_SEEN)) pending.push(["新しい端末", LS_SEEN, "1"]);
+    if (lsGet(LS_SEEN_MONTH) !== month) pending.push([`利用端末 ${month}`, LS_SEEN_MONTH, month]);
+    if (!pending.length) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      if (window.goatcounter && window.goatcounter.count) {
+        clearInterval(timer);
+        pending.forEach(([name, key, val]) => { track(name); lsSet(key, val); });
+      } else if (++tries > 20) {
+        clearInterval(timer);  // 読み込めない環境（広告ブロッカー等）では送らず、目印も残さない
+      }
+    }, 500);
   }
 
   function escapeHtml(s) {
@@ -1367,7 +1390,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.45";
+  const APP_VERSION = "2.46";
   let lastGasApplied = null;
 
   function refresh() {
@@ -1394,6 +1417,7 @@
   }
 
   $("appVersion").textContent = APP_VERSION;
+  trackDevice();
 
   // ご意見フォーム：アプリ版と端末の種類だけを自動で添える（名前などは送らない）
   function deviceLabel() {
