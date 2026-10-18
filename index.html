@@ -372,7 +372,7 @@
       <div class="result" id="resultBox" style="display:none;">
         <table>
           <tr><td>往復距離</td><td id="rKm"></td></tr>
-          <tr><td>ガソリン代 <span style="font-size:11px;color:var(--gray);">＝往復距離÷7km/L×(単価+10円)</span></td><td id="rFuel"></td></tr>
+          <tr><td>ガソリン代 <span style="font-size:11px;color:var(--gray);">＝往復距離÷<span id="rFuelEff">7</span>km/L×(単価+10円)</span></td><td id="rFuel"></td></tr>
           <tr><td>高速代（ETC往復）</td><td id="rToll"></td></tr>
           <tr id="rParkingRow" style="display:none;"><td>駐車場代（実費）</td><td id="rParking"></td></tr>
           <tr class="total"><td>精算額</td><td id="rTotal"></td></tr>
@@ -417,6 +417,25 @@
     </div>
 
     <div class="card">
+      <h2>燃費</h2>
+      <div class="info">
+        現在の燃費：<b id="fuelEffDisplay"></b> km/L <span class="badge" id="fuelEffBadge"></span>
+      </div>
+      <div class="info" style="margin-top:6px;">
+        通常はチーム標準の<b id="fuelEffStd"></b>km/Lのままで使ってください。必要なときだけ、
+        <b>この端末に限って</b>燃費を変更できます（他の人のアプリには影響しません）。
+      </div>
+      <label class="field">この端末での燃費（km/L）</label>
+      <div class="row">
+        <div><input type="number" id="fuelEffInput" step="0.1" min="1" max="50" inputmode="decimal" placeholder="例：10"></div>
+        <div style="flex:0 0 auto;">
+          <button class="btn-small" id="fuelEffSaveBtn" style="margin-top:0;padding:11px 16px;">保存</button>
+          <button class="btn-small btn-danger-text" id="fuelEffClearBtn" style="margin-top:0;padding:11px 12px;">標準に戻す</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>集合場所（出発地）</h2>
       <div class="info">
         現在の出発地：<b id="mpNameSetting"></b> <span class="badge" id="mpBadge"></span>
@@ -446,7 +465,7 @@
         <li>集合場所：<b>ローソン長岡京インター店</b>（標準）→ 会場の<b>時間最短ルート</b>（有料道路優先）。出発地は上の「集合場所（出発地）」からこの端末だけ変更できます</li>
         <li>ルート・高速料金は<b>計算のたびにNAVITIMEから最新を取得</b>（道路や料金の変更に自動追従）</li>
         <li>距離・ETC料金は<b>往復分</b>（片道の2倍）</li>
-        <li>燃費は <b>7km/L</b> で統一</li>
+        <li>燃費は <b>7km/L</b> が標準（上の「燃費」からこの端末だけ変更できます）</li>
         <li>ガソリン単価は「その週の京都府平均価格 <b>＋10円</b>」（毎週水〜金の夜に自動チェック・更新）</li>
         <li>ETC料金は<b>「試合の日付」の朝8時出発</b>として計算します（土日祝の<b>ETC休日割引を自動反映</b>。日付を変えるとルート・料金を取り直します）</li>
         <li>ガソリン単価は<b>計算した時点の最新週の価格</b>を使います（試合直後の精算を想定した割り切り仕様。週ごとの価格差は通常±1〜2円/Lで、精算額への影響は数十円未満）</li>
@@ -454,7 +473,7 @@
         <li>丸め方：ガソリン代のみ1円単位に四捨五入。精算額は内訳の合計そのまま（<b>10円丸めは廃止・PayPay精算対応</b>）／ 一人あたりは1円単位に切り上げ</li>
       </ul>
       <div class="info" style="margin-top:8px;">
-        計算式：<b>精算額 ＝ 往復距離 ÷ 7 ×（週次価格＋10円）＋ ETC片道×2 ＋ 駐車場代（実費）</b><br>
+        計算式：<b>精算額 ＝ 往復距離 ÷ 燃費（標準7km/L）×（週次価格＋10円）＋ ETC片道×2 ＋ 駐車場代（実費）</b><br>
         一人あたり ＝ 精算額 ÷ 割り勘人数（1円単位切り上げ）
       </div>
     </div>
@@ -517,9 +536,9 @@
 <script data-goatcounter="https://nagaokakyo-ss.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=242"></script>
-<script src="key.js?v=242"></script>
-<script src="calc.js?v=242"></script>
+<script src="data.js?v=243"></script>
+<script src="key.js?v=243"></script>
+<script src="calc.js?v=243"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -535,6 +554,7 @@
   const LS_APIKEY = "nss_rapidApiKey";
   const LS_HISTORY = "nss_venueHistory";
   const LS_MP = "nss_meetingPointOverride";
+  const LS_FUEL = "nss_fuelEfficiencyOverride";
   const HISTORY_MAX = 8;
 
   // ---------- utilities ----------
@@ -585,6 +605,14 @@
   }
   function effectiveMeetingPoint() {
     return meetingOverride() || D.meetingPoint;
+  }
+  // 燃費の上書き（この端末のみ）。壊れた値・範囲外は無視してチーム標準に戻す
+  function fuelOverride() {
+    const v = parseFloat(lsGet(LS_FUEL));
+    return v >= 1 && v <= 50 ? v : null;
+  }
+  function effectiveFuelEff() {
+    return fuelOverride() || D.fuelEfficiency;
   }
   function effectiveGasPrice() {
     const ov = gasOverride();
@@ -1011,7 +1039,7 @@
       parking: $("calcParking").value,
       gas: $("calcGas").value,
       pax: $("calcPax").value,
-      fuelEfficiency: D.fuelEfficiency,
+      fuelEfficiency: effectiveFuelEff(),
       gasSurcharge: D.gasSurcharge,
     });
   }
@@ -1049,6 +1077,7 @@
     }
     $("rKm").textContent = c.rtKm.toFixed(1) + " km";
     $("rFuel").textContent = yen(c.fuel);
+    $("rFuelEff").textContent = effectiveFuelEff();
     $("rToll").textContent = yen(c.toll);
     $("rParkingRow").style.display = c.parking > 0 ? "" : "none";
     $("rParking").textContent = yen(c.parking);
@@ -1060,7 +1089,7 @@
       $("rPerRow").style.display = "none";
     }
     $("rNote").textContent =
-      `単価 ${c.gas.toFixed(1)}＋10＝${c.unit.toFixed(1)}円/L ／ 燃費7km/L ／ 精算額＝ガソリン代＋高速代${c.parking > 0 ? "＋駐車場代" : ""}そのまま（丸めなし）`;
+      `単価 ${c.gas.toFixed(1)}＋10＝${c.unit.toFixed(1)}円/L ／ 燃費${effectiveFuelEff()}km/L ／ 精算額＝ガソリン代＋高速代${c.parking > 0 ? "＋駐車場代" : ""}そのまま（丸めなし）`;
     const warns = calcWarnings(c);
     const wBox = $("rWarn");
     if (warns.length) {
@@ -1107,7 +1136,7 @@
       `高速代（ETC往復）：${yen(c.toll)}`,
       icLine,
       c.parking > 0 ? `駐車場代（実費）：${yen(c.parking)}` : null,
-      `ガソリン代：${yen(c.fuel)}（${c.gas.toFixed(1)}+10円/L・燃費7km/L）`,
+      `ガソリン代：${yen(c.fuel)}（${c.gas.toFixed(1)}+10円/L・燃費${effectiveFuelEff()}km/L${fuelOverride() ? `※標準${D.fuelEfficiency}km/Lとは異なります` : ""}）`,
       `精算額：${yen(c.total)}`,
       c.per != null ? `割り勘人数：${c.pax}人 → 一人あたり：${yen(c.per)}` : null,
       "※非公式の補助ツールによる自動計算です（金額はご確認ください）",
@@ -1161,6 +1190,31 @@
     lsDel(LS_GAS);
     refresh();
     toast("自動更新の価格に戻しました");
+  });
+
+  // ---------- 燃費の設定 ----------
+  function renderFuelEff() {
+    const ov = fuelOverride();
+    $("fuelEffDisplay").textContent = effectiveFuelEff();
+    $("fuelEffStd").textContent = D.fuelEfficiency;
+    const badge = $("fuelEffBadge");
+    badge.className = ov ? "badge badge-local" : "badge badge-shared";
+    badge.textContent = ov ? "この端末で変更中" : "チーム標準";
+  }
+  $("fuelEffSaveBtn").addEventListener("click", () => {
+    const v = parseFloat($("fuelEffInput").value);
+    if (!(v >= 1 && v <= 50)) { toast("燃費は1〜50km/Lの範囲で入力してください"); return; }
+    track("燃費変更");
+    if (v === D.fuelEfficiency) lsDel(LS_FUEL);
+    else lsSet(LS_FUEL, String(v));
+    $("fuelEffInput").value = "";
+    refresh();
+    toast(`燃費を${v}km/Lにしました`);
+  });
+  $("fuelEffClearBtn").addEventListener("click", () => {
+    lsDel(LS_FUEL);
+    refresh();
+    toast(`標準の${D.fuelEfficiency}km/Lに戻しました`);
   });
 
   // ---------- 集合場所（出発地）の設定 ----------
@@ -1294,11 +1348,12 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.42";
+  const APP_VERSION = "2.43";
   let lastGasApplied = null;
 
   function refresh() {
     renderGas();
+    renderFuelEff();
     renderMeetingPoint();
     renderApiKey();
     renderHistory();
