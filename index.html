@@ -520,6 +520,7 @@
 
     <footer>
       作成・運営：井沢（チーム保護者）<br>
+      ご意見・ご要望は、井沢までLINEで。匿名で送りたい方は<a id="feedbackLink" href="https://docs.google.com/forms/d/e/1FAIpQLSd6P1TR74nVcg81vsnUTLpXvy8X8xtqmz6APFwmwYZYNPsYvA/viewform" target="_blank" rel="noopener">こちらのフォーム</a>から<br>
       データ更新日：<span id="dataUpdated"></span> ／ アプリ版：<span id="appVersion"></span><br>
       会場検索・ルート・高速料金：NAVITIME ／ 住所検索：国土地理院 ／ © OpenStreetMap contributors<br>
       本アプリはチーム非公式・非商用の補助ツールです。金額の正確性は保証されません。必ずご確認のうえご利用ください<br>
@@ -536,9 +537,9 @@
 <script data-goatcounter="https://nagaokakyo-ss.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=243"></script>
-<script src="key.js?v=243"></script>
-<script src="calc.js?v=243"></script>
+<script src="data.js?v=244"></script>
+<script src="key.js?v=244"></script>
+<script src="calc.js?v=244"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -1348,7 +1349,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.43";
+  const APP_VERSION = "2.44";
   let lastGasApplied = null;
 
   function refresh() {
@@ -1375,6 +1376,25 @@
   }
 
   $("appVersion").textContent = APP_VERSION;
+
+  // ご意見フォーム：アプリ版と端末の種類だけを自動で添える（名前などは送らない）
+  function deviceLabel() {
+    const ua = navigator.userAgent;
+    const os = /iPhone/.test(ua) ? "iPhone"
+      : /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "iPad"
+      : /Android/.test(ua) ? "Android"
+      : /Windows/.test(ua) ? "Windows"
+      : /Macintosh/.test(ua) ? "Mac" : "その他";
+    const br = /\bLine\//i.test(ua) ? "LINE内ブラウザ"
+      : /CriOS|Chrome\//.test(ua) && !/Edg/.test(ua) ? "Chrome"
+      : /Edg/.test(ua) ? "Edge"
+      : /Safari\//.test(ua) ? "Safari" : "その他";
+    return `${os} / ${br}`;
+  }
+  $("feedbackLink").href =
+    "https://docs.google.com/forms/d/e/1FAIpQLSd6P1TR74nVcg81vsnUTLpXvy8X8xtqmz6APFwmwYZYNPsYvA/viewform?usp=pp_url" +
+    "&entry.971633728=" + encodeURIComponent(APP_VERSION) +
+    "&entry.178433580=" + encodeURIComponent(deviceLabel());
   $("dataUpdated").textContent = D.dataUpdated;
 
   const today = new Date();
