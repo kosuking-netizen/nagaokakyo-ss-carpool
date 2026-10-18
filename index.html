@@ -537,9 +537,9 @@
 <script data-goatcounter="https://nagaokakyo-ss.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 
 <!-- ?v= はアプリ版と合わせて更新（HTMLとJSの版ずれによるキャッシュ事故防止） -->
-<script src="data.js?v=244"></script>
-<script src="key.js?v=244"></script>
-<script src="calc.js?v=244"></script>
+<script src="data.js?v=245"></script>
+<script src="key.js?v=245"></script>
+<script src="calc.js?v=245"></script>
 <script>
 (function () {
   const D = window.APP_DATA;
@@ -614,6 +614,18 @@
   }
   function effectiveFuelEff() {
     return fuelOverride() || D.fuelEfficiency;
+  }
+  // 価格上書きを保存してからの日数（保存日時がない古いデータはnull）
+  function gasOverrideAgeDays() {
+    const ov = gasOverride();
+    if (!ov || !ov.savedAt) return null;
+    const t = new Date(ov.savedAt).getTime();
+    return isFinite(t) ? Math.floor((Date.now() - t) / 86400000) : null;
+  }
+  // 計算に使っている価格が、この端末の上書き価格そのものかどうか
+  function usingGasOverride(gas) {
+    const ov = gasOverride();
+    return !!ov && Math.abs(gas - ov.price) < 0.05;
   }
   function effectiveGasPrice() {
     const ov = gasOverride();
@@ -1064,6 +1076,11 @@
     if (age != null && age > 10 && !gasOverride()) {
       w.push(`ガソリン価格が${age}日前の週のデータです。自動更新が止まっている可能性があるため、設定タブから最新価格を確認してください。`);
     }
+    // 上書きは解除するまで残るため、古くなったら気づけるようにする
+    const ovAge = gasOverrideAgeDays();
+    if (usingGasOverride(c.gas) && ovAge != null && ovAge >= 10) {
+      w.push(`この端末で上書きしたガソリン価格（${ovAge}日前に保存）を使っています。古い価格のままの可能性があるため、設定タブで「解除」してください。`);
+    }
     return w;
   }
 
@@ -1138,6 +1155,7 @@
       icLine,
       c.parking > 0 ? `駐車場代（実費）：${yen(c.parking)}` : null,
       `ガソリン代：${yen(c.fuel)}（${c.gas.toFixed(1)}+10円/L・燃費${effectiveFuelEff()}km/L${fuelOverride() ? `※標準${D.fuelEfficiency}km/Lとは異なります` : ""}）`,
+      usingGasOverride(c.gas) ? `※ガソリン価格はこの端末で上書きした値です（自動更新の価格：${D.gasPrice.price.toFixed(1)}円/L）` : null,
       `精算額：${yen(c.total)}`,
       c.per != null ? `割り勘人数：${c.pax}人 → 一人あたり：${yen(c.per)}` : null,
       "※非公式の補助ツールによる自動計算です（金額はご確認ください）",
@@ -1349,7 +1367,7 @@
   });
 
   // ---------- init / refresh ----------
-  const APP_VERSION = "2.44";
+  const APP_VERSION = "2.45";
   let lastGasApplied = null;
 
   function refresh() {
